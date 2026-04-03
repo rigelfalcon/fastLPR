@@ -1,0 +1,153 @@
+#!/bin/sh
+# Configure script for fastLPR R package (Linux/macOS/Unix)
+# Detects FFTW3 availability and configures build accordingly
+#
+# Cross-Platform Detection Strategy:
+#   1. pkg-config (standard method on Linux/macOS)
+#   2. Direct library search with compilation test
+#   3. Common installation paths (/usr/local, Homebrew, MacPorts, Conda)
+#
+# This script generates src/Makevars with detected FFTW3 settings.
+# If FFTW3 is not found, Armadillo's internal FFT is used (fully functional).
+
+# Find R_HOME if not set
+: ${R_HOME=$(R RHOME)}
+if test -z "${R_HOME}"; then
+    echo "Cannot determine R_HOME. Please set R_HOME environment variable."
+    exit 1
+fi
+
+# Get compiler info from R
+CC=$("${R_HOME}/bin/R" CMD config CC)
+CFLAGS=$("${R_HOME}/bin/R" CMD config CFLAGS)
+CXX=$("${R_HOME}/bin/R" CMD config CXX)
+CXXFLAGS=$("${R_HOME}/bin/R" CMD config CXXFLAGS)
+
+# Initialize FFTW3 flags
+FFTW3_CFLAGS=""
+FFTW3_LIBS=""
+FFTW3_DEFINE=""
+FFTW3_FOUND="no"
+
+echo "Checking for FFTW3..."
+
+# ============================================================================
+# Method 1: User-specified LIB_FFTW3 environment variable
+# ============================================================================
+if [ -n "${LIB_FFTW3}" ]; then
+    if [ -f "${LIB_FFTW3}/lib/libfftw3.a" ] || [ -f "${LIB_FFTW3}/lib/libfftw3.so" ] || [ -f "${LIB_FFTW3}/lib/libfftw3.dylib" ]; then
+        FFTW3_CFLAGS="-I${LIB_FFTW3}/include"
+        FFTW3_LIBS="-L${LIB_FFTW3}/lib -lfftw3"
+        FFTW3_FOUND="yes (LIB_FFTW3: ${LIB_FFTW3})"
+    fi
+fi
+
+# ============================================================================
+# Method 2: pkg-config (standard method)
+# ============================================================================
+if [ "${FFTW3_FOUND}" = "no" ]; then
+    if command -v pkg-config >/dev/null 2>&1; then
+        if pkg-config --exists fftw3 2>/dev/null; then
+            FFTW3_CFLAGS=$(pkg-config --cflags fftw3 2>/dev/null)
+            FFTW3_LIBS=$(pkg-config --libs fftw3 2>/dev/null)
+            FFTW3_FOUND="yes (pkg-config)"
+        fi
+    fi
+fi
+
+# ============================================================================
+# Method 3: Direct library search with compilation test
+# ============================================================================
+if [ "${FFTW3_FOUND}" = "no" ]; then
+    # Create test program
+    cat > conftest.c << 'EOF'
+#include <fftw3.h>
+int main() {
+    fftw_complex *in;
+    fftw_plan p;
+    in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * 8);
+    p = fftw_plan_dft_1d(8, in, in, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftw_destroy_plan(p);
+    fftw_free(in);
+    return 0;
+}
+EOF
+
+    # Try standard paths first
+    if $CC $CFLAGS -o conftest conftest.c -lfftw3 -lm >/dev/null 2>&1; then
+        FFTW3_LIBS="-lfftw3"
+        FFTW3_FOUND="yes (system)"
+    fi
+
+    # Try common library locations if not found
+    if [ "${FFTW3_FOUND}" = "no" ]; then
+        # List of common FFTW3 installation paths
+        SEARCH_PATHS="/usr/local /opt/local /opt/homebrew /usr/local/opt/fftw"
+
+        # Add Conda paths if CONDA_PREFIX is set
+        if [ -n "${CONDA_PREFIX}" ]; then
+            SEARCH_PATHS="${CONDA_PREFIX} ${SEARCH_PATHS}"
+        fi
+
+        # Add user-specified PREFIX if set
+        if [ -n "${PREFIX}" ]; then
+            SEARCH_PATHS="${PREFIX} ${SEARCH_PATHS}"
+        fi
+
+        for PREFIX_PATH in ${SEARCH_PATHS}; do
+            if [ -d "${PREFIX_PATH}/include" ] && [ -d "${PREFIX_PATH}/lib" ]; then
+                if $CC $CFLAGS -I${PREFIX_PATH}/include -L${PREFIX_PATH}/lib -o conftest conftest.c -lfftw3 -lm >/dev/null 2>&1; then
+                    FFTW3_CFLAGS="-I${PREFIX_PATH}/include"
+                    FFTW3_LIBS="-L${PREFIX_PATH}/lib -lfftw3"
+                    FFTW3_FOUND="yes (${PREFIX_PATH})"
+                    break
+                fi
+            fi
+        done
+    fi
+
+    rm -f conftest conftest.c
+fi
+
+# ============================================================================
+# Set ARMA_USE_FFTW3 define if found
+# ============================================================================
+if [ "${FFTW3_FOUND}" != "no" ]; then
+    FFTW3_DEFINE="-DARMA_USE_FFTW3"
+    echo "  FFTW3 found: ${FFTW3_FOUND}"
+    echo "  FFTW3 will be used for faster FFT operations"
+else
+    echo "  FFTW3 not found"
+    echo "  Using Armadillo's internal FFT (fully functional, slightly slower for large arrays)"
+    echo ""
+    echo "  To enable FFTW3 for faster FFT (optional):"
+    echo "    Linux:  apt install libfftw3-dev  (Debian/Ubuntu)"
+    echo "            dnf install fftw-devel    (Fedora/RHEL)"
+    echo "    macOS:  brew install fftw         (Homebrew)"
+    echo "            port install fftw-3       (MacPorts)"
+    echo "    Conda:  conda install fftw"
+    echo "    Manual: Set LIB_FFTW3 environment variable to FFTW3 root"
+fi
+
+# ============================================================================
+# Generate src/Makevars
+# ============================================================================
+echo ""
+echo "Generating src/Makevars..."
+
+cat > src/Makevars << EOF
+# Makevars generated by configure script
+# FFTW3 status: ${FFTW3_FOUND}
+
+PKG_CXXFLAGS = \$(SHLIB_OPENMP_CXXFLAGS) ${FFTW3_CFLAGS} ${FFTW3_DEFINE}
+PKG_LIBS = \$(SHLIB_OPENMP_CXXFLAGS) \$(LAPACK_LIBS) \$(BLAS_LIBS) \$(FLIBS) ${FFTW3_LIBS}
+
+# Enable C++11 features
+CXX_STD = CXX11
+EOF
+
+echo "Configuration complete."
+echo ""
+echo "Build flags:"
+echo "  PKG_CXXFLAGS: \$(SHLIB_OPENMP_CXXFLAGS) ${FFTW3_CFLAGS} ${FFTW3_DEFINE}"
+echo "  PKG_LIBS: \$(SHLIB_OPENMP_CXXFLAGS) \$(LAPACK_LIBS) \$(BLAS_LIBS) \$(FLIBS) ${FFTW3_LIBS}"

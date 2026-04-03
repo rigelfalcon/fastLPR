@@ -1,0 +1,105 @@
+# Makevars.ucrt for fastLPR R package (Windows with UCRT)
+#
+# Build configuration for Windows with R 4.2+ and Rtools42/43/44/45+.
+# This file takes precedence over Makevars.win on R 4.2+ (UCRT-based R).
+#
+# FFTW3 is optional - Armadillo uses its internal FFT if FFTW3 is not available.
+# FFTW3 provides faster FFT operations for large arrays.
+#
+# To enable FFTW3 (optional):
+#   1. Install FFTW3 in Rtools MSYS2 shell:
+#      pacman -S mingw-w64-ucrt-x86_64-fftw
+#   2. Set LIB_FFTW3 environment variable OR rely on auto-detection
+#
+# BLAS/LAPACK: Linked via R's standard macros
+
+# ============================================================================
+# FFTW3 Auto-Detection using $(wildcard)
+# Priority: Environment variable > Common installation paths
+# ============================================================================
+
+# Method 1: User-specified LIB_FFTW3 environment variable
+ifdef LIB_FFTW3
+    HAVE_FFTW3 := $(wildcard $(LIB_FFTW3)/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3),)
+        FFTW3_CFLAGS = -I$(LIB_FFTW3)/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = $(LIB_FFTW3)/lib/libfftw3.a
+    endif
+endif
+
+# Method 2: R_TOOLS_SOFT (set by modern Rtools installers)
+ifndef FFTW3_LIBS
+    ifdef R_TOOLS_SOFT
+        HAVE_FFTW3 := $(wildcard $(R_TOOLS_SOFT)/lib/libfftw3.a)
+        ifneq ($(HAVE_FFTW3),)
+            FFTW3_CFLAGS = -I$(R_TOOLS_SOFT)/include -DARMA_USE_FFTW3
+            FFTW3_LIBS = $(R_TOOLS_SOFT)/lib/libfftw3.a
+        endif
+    endif
+endif
+
+# Method 3: Auto-detect from common Rtools paths (C: drive, Windows format)
+ifndef FFTW3_LIBS
+    # Rtools45 on C:
+    HAVE_FFTW3_45 := $(wildcard C:/rtools45/ucrt64/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3_45),)
+        FFTW3_CFLAGS = -IC:/rtools45/ucrt64/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = C:/rtools45/ucrt64/lib/libfftw3.a
+    endif
+endif
+
+ifndef FFTW3_LIBS
+    # Rtools44 on C:
+    HAVE_FFTW3_44 := $(wildcard C:/rtools44/ucrt64/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3_44),)
+        FFTW3_CFLAGS = -IC:/rtools44/ucrt64/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = C:/rtools44/ucrt64/lib/libfftw3.a
+    endif
+endif
+
+ifndef FFTW3_LIBS
+    # Rtools43 on C:
+    HAVE_FFTW3_43 := $(wildcard C:/rtools43/ucrt64/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3_43),)
+        FFTW3_CFLAGS = -IC:/rtools43/ucrt64/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = C:/rtools43/ucrt64/lib/libfftw3.a
+    endif
+endif
+
+ifndef FFTW3_LIBS
+    # Rtools45 on D: (alternative location)
+    HAVE_FFTW3_D45 := $(wildcard D:/rtools45/ucrt64/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3_D45),)
+        FFTW3_CFLAGS = -ID:/rtools45/ucrt64/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = D:/rtools45/ucrt64/lib/libfftw3.a
+    endif
+endif
+
+ifndef FFTW3_LIBS
+    # Rtools44 on D:
+    HAVE_FFTW3_D44 := $(wildcard D:/rtools44/ucrt64/lib/libfftw3.a)
+    ifneq ($(HAVE_FFTW3_D44),)
+        FFTW3_CFLAGS = -ID:/rtools44/ucrt64/include -DARMA_USE_FFTW3
+        FFTW3_LIBS = D:/rtools44/ucrt64/lib/libfftw3.a
+    endif
+endif
+
+# Default: Empty if FFTW3 not found (Armadillo will use internal FFT)
+FFTW3_CFLAGS ?=
+FFTW3_LIBS ?=
+
+# ============================================================================
+# Final compiler and linker flags
+# ============================================================================
+
+# Compiler flags
+# - $(SHLIB_OPENMP_CXXFLAGS): OpenMP flags (if available, defined by R)
+# - FFTW3_CFLAGS: Include path and -DARMA_USE_FFTW3 if FFTW3 is available
+PKG_CXXFLAGS = $(SHLIB_OPENMP_CXXFLAGS) $(FFTW3_CFLAGS)
+
+# Linker flags
+# - $(SHLIB_OPENMP_CXXFLAGS): OpenMP runtime library
+# - $(LAPACK_LIBS) $(BLAS_LIBS): Linear algebra libraries from R
+# - $(FLIBS): Fortran runtime libraries (required for LAPACK)
+# - FFTW3_LIBS: FFTW3 static library (if available)
+PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(FFTW3_LIBS)

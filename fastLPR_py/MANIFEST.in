@@ -1,0 +1,3 @@
+include LICENSE
+include README.md
+recursive-include src/fastlpr *.py *.pyx *.pxd py.typed

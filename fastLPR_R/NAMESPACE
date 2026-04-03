@@ -1,0 +1,45 @@
+# Load compiled C++ code (Rcpp acceleration)
+useDynLib(fastlpr, .registration = TRUE)
+importFrom(Rcpp, evalCpp)
+
+# Export main API functions
+export(cv_fastlpr)
+export(cv_fastkde)
+export(get_hlist)
+export(fastlpr_predict)
+export(fastlpr_interval)
+export(fastlpr_plot)
+export(fastlpr_plot_interval)
+export(fastkde_plot)
+export(fastkde_plot_bandwidth)
+
+# Export utility functions
+export(multispace)
+export(set_defaults)
+export(zscore)
+
+# Export Rcpp status functions
+export(rcpp_available)
+export(get_rcpp_info)
+
+# Export S3 class check functions
+export(is_fastlpr_result)
+export(is_fastkde_result)
+
+# Import required functions
+importFrom("stats", "sd", "var", "quantile", "dnorm", "fft", "runif", "bw.nrd0", "mvfft", "qnorm", "rnorm")
+importFrom("utils", "head", "tail", "combn")
+importFrom("grDevices", "dev.off", "png", "pdf", "col2rgb", "heat.colors", "rgb", "terrain.colors")
+importFrom("graphics", "plot", "lines", "points", "legend", "title", "axis", "filled.contour", "persp", "plot.new", "polygon", "text")
+importFrom("methods", "new", "validObject")
+
+# Import Matrix for sparse operations
+importFrom("Matrix", "sparseMatrix")
+
+# S3 methods
+S3method(print, fastlpr_result)
+S3method(print, fastkde_result)
+S3method(plot, fastlpr_result)
+S3method(plot, fastkde_result)
+S3method(predict, fastlpr_result)
+S3method(summary, fastlpr_result)

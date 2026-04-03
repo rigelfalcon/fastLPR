@@ -1,0 +1,148 @@
+#!/bin/sh
+# configure.win for fastLPR R package (Windows)
+# Detects FFTW3 availability and configures build accordingly
+# IMPORTANT: Uses STATIC linking to avoid DLL runtime dependency issues
+#
+# Cross-Platform Detection Strategy:
+#   1. LIB_FFTW3 environment variable (user-specified)
+#   2. R_TOOLS_SOFT environment variable (set by modern Rtools)
+#   3. RTOOLS*_HOME environment variables
+#   4. Common installation paths (C: and D: drives)
+
+echo "Checking for FFTW3 on Windows..."
+
+FFTW3_CFLAGS=""
+FFTW3_LIBS=""
+FFTW3_DEFINE=""
+FFTW3_FOUND="no"
+
+# ============================================================================
+# Method 1: User-specified LIB_FFTW3 environment variable
+# ============================================================================
+if [ -n "${LIB_FFTW3}" ]; then
+    # Check for static library (preferred - no DLL dependency)
+    if [ -f "${LIB_FFTW3}/lib/libfftw3.a" ]; then
+        FFTW3_CFLAGS="-I${LIB_FFTW3}/include"
+        # Use static linking: specify .a file directly to avoid DLL issues
+        FFTW3_LIBS="${LIB_FFTW3}/lib/libfftw3.a"
+        FFTW3_DEFINE="-DARMA_USE_FFTW3"
+        FFTW3_FOUND="yes (LIB_FFTW3: ${LIB_FFTW3})"
+    fi
+fi
+
+# ============================================================================
+# Method 2: R_TOOLS_SOFT (set by modern Rtools installers)
+# ============================================================================
+if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${R_TOOLS_SOFT}" ]; then
+    if [ -f "${R_TOOLS_SOFT}/lib/libfftw3.a" ]; then
+        FFTW3_CFLAGS="-I${R_TOOLS_SOFT}/include"
+        FFTW3_LIBS="${R_TOOLS_SOFT}/lib/libfftw3.a"
+        FFTW3_DEFINE="-DARMA_USE_FFTW3"
+        FFTW3_FOUND="yes (R_TOOLS_SOFT: ${R_TOOLS_SOFT})"
+    fi
+fi
+
+# ============================================================================
+# Method 3: RTOOLS*_HOME environment variables
+# Convert Windows path to MSYS2 path format for linker compatibility
+# ============================================================================
+convert_to_msys_path() {
+    # Convert C:\path to /c/path format
+    echo "$1" | sed 's|\\|/|g' | sed 's|^\([A-Za-z]\):|/\L\1|'
+}
+
+if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS45_HOME}" ]; then
+    # Convert Windows path to MSYS2 format
+    RTOOLS45_MSYS=$(convert_to_msys_path "${RTOOLS45_HOME}")
+    FFTW_PATH="${RTOOLS45_MSYS}/ucrt64"
+    if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
+        FFTW3_CFLAGS="-I${FFTW_PATH}/include"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_DEFINE="-DARMA_USE_FFTW3"
+        FFTW3_FOUND="yes (RTOOLS45_HOME: ${FFTW_PATH})"
+    fi
+fi
+
+if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS44_HOME}" ]; then
+    RTOOLS44_MSYS=$(convert_to_msys_path "${RTOOLS44_HOME}")
+    FFTW_PATH="${RTOOLS44_MSYS}/ucrt64"
+    if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
+        FFTW3_CFLAGS="-I${FFTW_PATH}/include"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_DEFINE="-DARMA_USE_FFTW3"
+        FFTW3_FOUND="yes (RTOOLS44_HOME: ${FFTW_PATH})"
+    fi
+fi
+
+if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS43_HOME}" ]; then
+    RTOOLS43_MSYS=$(convert_to_msys_path "${RTOOLS43_HOME}")
+    FFTW_PATH="${RTOOLS43_MSYS}/ucrt64"
+    if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
+        FFTW3_CFLAGS="-I${FFTW_PATH}/include"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_DEFINE="-DARMA_USE_FFTW3"
+        FFTW3_FOUND="yes (RTOOLS43_HOME: ${FFTW_PATH})"
+    fi
+fi
+
+# ============================================================================
+# Method 4: Common Rtools installation paths (C: and D: drives)
+# ============================================================================
+if [ "${FFTW3_FOUND}" = "no" ]; then
+    # Check common Rtools locations on C: drive - ucrt64 first (modern), then mingw64
+    # MSYS2 path format: /c/rtools4X = C:\rtools4X
+    for RTOOLS_PATH in "/c/rtools45" "/c/rtools44" "/c/rtools43" "/c/rtools42" \
+                       "/d/rtools45" "/d/rtools44" "/d/rtools43"; do
+        # Try ucrt64 first (modern toolchain for R 4.2+)
+        FFTW_PATH="${RTOOLS_PATH}/ucrt64"
+        if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
+            FFTW3_CFLAGS="-I${FFTW_PATH}/include"
+            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+            FFTW3_DEFINE="-DARMA_USE_FFTW3"
+            FFTW3_FOUND="yes (${FFTW_PATH} static)"
+            break
+        fi
+        # Try mingw64 as fallback (older Rtools)
+        FFTW_PATH="${RTOOLS_PATH}/mingw64"
+        if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
+            FFTW3_CFLAGS="-I${FFTW_PATH}/include"
+            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+            FFTW3_DEFINE="-DARMA_USE_FFTW3"
+            FFTW3_FOUND="yes (${FFTW_PATH} static)"
+            break
+        fi
+    done
+fi
+
+# ============================================================================
+# Output detection results
+# ============================================================================
+if [ "${FFTW3_FOUND}" = "no" ]; then
+    echo "  FFTW3 not found"
+    echo "  Using Armadillo's internal FFT (fully functional)"
+    echo ""
+    echo "  To enable FFTW3 for faster FFT (optional):"
+    echo "    Option 1: Install via Rtools MSYS2 shell:"
+    echo "              pacman -S mingw-w64-ucrt-x86_64-fftw"
+    echo "    Option 2: Set LIB_FFTW3 environment variable to FFTW3 root"
+    echo ""
+else
+    echo "  FFTW3 found: ${FFTW3_FOUND}"
+    echo "  FFTW3 will be used for faster FFT operations"
+fi
+
+echo ""
+echo "Generating src/Makevars.win..."
+
+cat > src/Makevars.win << EOF
+# Makevars.win generated by configure.win script
+# FFTW3 status: ${FFTW3_FOUND}
+
+PKG_CXXFLAGS = \$(SHLIB_OPENMP_CXXFLAGS) ${FFTW3_CFLAGS} ${FFTW3_DEFINE}
+PKG_LIBS = \$(SHLIB_OPENMP_CXXFLAGS) \$(LAPACK_LIBS) \$(BLAS_LIBS) \$(FLIBS) ${FFTW3_LIBS}
+
+# Enable C++11 features
+CXX_STD = CXX11
+EOF
+
+echo "Configuration complete."

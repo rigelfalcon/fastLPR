@@ -1,0 +1,68 @@
+# Development files
+^dev$
+^dev/\.python-version$
+^\.spec-workflow$
+
+# Git files
+^\.git$
+^\.gitignore$
+
+# IDE files
+^\.Rproj\.user$
+^.*\.Rproj$
+^\.vscode$
+
+# R session files
+^\.Rhistory$
+^\.RData$
+^\.Ruserdata$
+
+# AI context files
+^CLAUDE\.md$
+
+# Development scripts at root
+^setup\.R$
+^demo_.*\.R$
+^run_all_demos\.R$
+
+# Generated figures (development)
+^fig$
+
+# Test artifacts
+^tests/.*\.Rout$
+^tests/.*\.mat$
+^tests/\.RData$
+
+# Test documentation (not package docs)
+^tests/DELIVERABLES\.md$
+^tests/README.*\.md$
+^tests/TESTING_GUIDE\.md$
+^tests/TEST_.*\.md$
+^tests/run_.*\.R$
+^tests/test_(?!.*testthat).*\.R$
+^tests/verify_.*\.R$
+^tests/install_packages\.R$
+^tests/quick_test\.R$
+^tests/visualize_.*\.R$
+^tests/profile_.*\.R$
+^tests/test_.*\.R$
+
+# Build artifacts
+^.*\.tar\.gz$
+
+# Documentation files not needed in package
+^cran-comments\.md$
+
+# Windows compilation artifacts
+^cleanup$
+^configure$
+^configure\.win$
+
+# Compiled DLL files (should not be in source package)
+^src/.*\.dll$
+^src/.*\.so$
+^src/.*\.o$
+
+# R CMD check output directory
+^\.\.Rcheck$
+^\.\*Rcheck$

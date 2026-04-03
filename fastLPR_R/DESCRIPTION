@@ -1,0 +1,47 @@
+Package: fastlpr
+Title: Fast Local Polynomial Regression and Kernel Density Estimation
+Version: 1.0.0
+Authors@R: c(
+    person("Ying", "Wang", email = "yingwangrigel@gmail.com", role = c("aut", "cre")),
+    person("Min", "Li", email = "minli.231314@gmail.com", role = "aut")
+    )
+Author: Ying Wang [aut, cre], Min Li [aut]
+Maintainer: Ying Wang <yingwangrigel@gmail.com>
+Description: NUFFT-accelerated local polynomial regression and kernel density estimation
+    for large, scattered, or complex-valued datasets. Provides automatic bandwidth
+    selection via Generalized Cross-Validation (GCV) for regression and Likelihood
+    Cross-Validation (LCV) for density estimation. This is the R port of the fastLPR
+    MATLAB/Python toolbox, achieving O(N + M log M) computational complexity through
+    custom Non-Uniform Fast Fourier Transform implementation with Gaussian gridding.
+    Supports 1D/2D/3D data, complex-valued responses, heteroscedastic variance estimation,
+    and confidence interval computation. Performance optimized with vectorized R code
+    and compiled helpers via Rcpp/RcppArmadillo.
+License: GPL-3 + file LICENSE
+Encoding: UTF-8
+LazyData: false
+ByteCompile: false
+Depends:
+    R (>= 4.0.0)
+Imports:
+    stats,
+    utils,
+    grDevices,
+    graphics,
+    methods,
+    Matrix (>= 1.0.0),
+    Rcpp (>= 1.0.0)
+Suggests:
+    testthat (>= 3.0.0),
+    akima,
+    interp,
+    fields,
+    rgl,
+    R.matlab
+LinkingTo:
+    Rcpp,
+    RcppArmadillo
+SystemRequirements: GNU make
+URL: https://github.com/ccclab-bigdata/jss-code
+BugReports: https://github.com/ccclab-bigdata/jss-code/issues
+RoxygenNote: 7.3.1
+Roxygen: list(markdown = TRUE)

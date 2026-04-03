@@ -1,0 +1,42 @@
+# Makevars for fastLPR R package (Linux/macOS)
+#
+# Build configuration for Unix-like systems (Linux, macOS).
+# For Windows, see Makevars.win (Rtools40) or Makevars.ucrt (Rtools42+).
+#
+# Uses RcppArmadillo for linear algebra and FFT operations.
+# FFTW3 is optional - Armadillo uses its internal FFT if FFTW3 is not available.
+#
+# OpenMP Support:
+#   - Linux: Typically available via GCC
+#   - macOS: Requires libomp (brew install libomp) or may not be available
+#   - $(SHLIB_OPENMP_CXXFLAGS) is defined by R if OpenMP is available
+#   - If not available, the code compiles without parallelization
+#
+# FFTW3 Configuration (Optional - NOT required for basic usage):
+#   - Detected automatically via pkg-config
+#   - Install: apt install libfftw3-dev (Linux) / brew install fftw (macOS)
+#   - If not found, Armadillo uses its internal FFT implementation
+#
+# BLAS/LAPACK:
+#   - Linked via R's standard macros $(LAPACK_LIBS) $(BLAS_LIBS)
+#   - These use R's bundled BLAS/LAPACK or system libraries
+
+# Detect FFTW3 using pkg-config (graceful fallback if not found)
+# On systems without FFTW3, these will be empty strings
+FFTW3_CFLAGS = $(shell pkg-config --cflags fftw3 2>/dev/null)
+FFTW3_LIBS = $(shell pkg-config --libs fftw3 2>/dev/null)
+
+# Only define ARMA_USE_FFTW3 if FFTW3 was found
+FFTW3_DEFINE = $(if $(FFTW3_LIBS),-DARMA_USE_FFTW3,)
+
+# Compiler flags
+# - $(SHLIB_OPENMP_CXXFLAGS): OpenMP flags (if available, defined by R)
+# - FFTW3_DEFINE: -DARMA_USE_FFTW3 if FFTW3 is available
+PKG_CXXFLAGS = $(SHLIB_OPENMP_CXXFLAGS) $(FFTW3_CFLAGS) $(FFTW3_DEFINE)
+
+# Linker flags
+# - $(SHLIB_OPENMP_CXXFLAGS): OpenMP runtime library
+# - $(LAPACK_LIBS) $(BLAS_LIBS): Linear algebra libraries from R
+# - $(FLIBS): Fortran runtime libraries (required for LAPACK)
+# - FFTW3_LIBS: FFTW3 library (if available)
+PKG_LIBS = $(SHLIB_OPENMP_CXXFLAGS) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(FFTW3_LIBS)
