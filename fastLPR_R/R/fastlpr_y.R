@@ -5,7 +5,7 @@
 #'
 #' Mirrors: fastLPR/utility/core/fastLPR_y.m
 #'
-#' REFACTORED 2025-12: Unified implementation for arbitrary dx.
+#' Unified implementation for arbitrary dx.
 #' - 1D case: Specialized with approxfun for performance
 #' - dx >= 2: Single unified code path using dynamic N-D array operations
 #'
@@ -119,7 +119,7 @@ row_sd <- function(x) {
   # OPTIMIZATION: Use interp_batch_fast for batch interpolation (unified N-D, O(N))
 
   # Extract grid values for all bandwidths: mq is (Ng, dh)
-  # FIX 2025-12-18: Always ensure yhat_grid is a matrix (Ng x dh)
+  # Always ensure yhat_grid is a matrix (Ng x dh)
   if (is.null(dim(mq))) {
     yhat_grid <- matrix(mq, ncol = 1)
   } else if (length(dim(mq)) == 2) {
@@ -140,7 +140,7 @@ row_sd <- function(x) {
     dx = 1
   )
 
-  # FIX 2025-12-18: Ensure yhat_data is always a matrix (Tx x dh)
+  # Ensure yhat_data is always a matrix (Tx x dh)
   # interp_batch_fast may return a vector when dh=1
   if (is.null(dim(yhat_data))) {
     yhat_data <- matrix(yhat_data, ncol = dh)
@@ -216,7 +216,7 @@ row_sd <- function(x) {
   }
 
   # Use interpolated data values at the selected bandwidth
-  # FIX 2025-12-18: Handle single bandwidth case properly (dh=1)
+  # Handle single bandwidth case properly (dh=1)
   # Use drop=FALSE or direct indexing to avoid dimension dropping
   if (dh == 1) {
     regs$yhat <- yhat_data[, 1]
@@ -254,7 +254,7 @@ row_sd <- function(x) {
     id1se = id1se,
     mse = matrix(mse, ncol = 1),
     rss = matrix(rss, ncol = 1),
-    yhat_1se = if (dh == 1) yhat_data[, 1] else yhat_data[, id1se],  # FIX 2025-12-18
+    yhat_1se = if (dh == 1) yhat_data[, 1] else yhat_data[, id1se],
     pdof_m = if (exists("pdof_vals")) matrix(pdof_vals, ncol = 1) else NULL,
     df_m = if (exists("df_vals")) matrix(df_vals, ncol = 1) else NULL
   )
@@ -545,7 +545,7 @@ row_sd <- function(x) {
       regs$yhat <- yhat_data[, 1]  # Select first bandwidth
       regs$yhat_data <- yhat_data  # Keep all bandwidths for reference
 
-      # FIX 2025-12-27: Create fpp_yhat for single bandwidth case
+      # Create fpp_yhat for single bandwidth case
       # This was missing, causing benchmark failures for N <= 65536
       if (length(mq_dims) == dx + 1) {
         # Single response: mq is (N[1], ..., N[dx], dh)

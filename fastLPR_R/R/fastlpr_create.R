@@ -81,7 +81,7 @@ fastlpr_create <- function(x, y, h = NULL, opt = NULL) {
 
   if (!is.list(opt$y_grid_opt)) {
     opt$y_grid_opt <- list(
-      # FIX 2025-12-16: Changed from "spline" to "linear" to match:
+      # Changed from "spline" to "linear" to match:
       # 1. MATLAB's griddedInterpolant('linear') used in cv_fastKDE
       # 2. The hardcoded "linear" in fastkde_lcv() for LCV computation
       # This ensures consistency between LCV values and fpp.evaluate()

@@ -16,32 +16,29 @@ Description: NUFFT-accelerated local polynomial regression and kernel density es
     Supports 1D/2D/3D data, complex-valued responses, heteroscedastic variance estimation,
     and confidence interval computation. Performance optimized with vectorized R code
     and compiled helpers via Rcpp/RcppArmadillo.
-License: GPL-3 + file LICENSE
+License: GPL-3
 Encoding: UTF-8
 LazyData: false
 ByteCompile: false
 Depends:
-    R (>= 4.0.0)
+    R (>= 4.2.0)
 Imports:
     stats,
     utils,
     grDevices,
     graphics,
-    methods,
-    Matrix (>= 1.0.0),
+    compiler,
     Rcpp (>= 1.0.0)
 Suggests:
     testthat (>= 3.0.0),
     akima,
-    interp,
-    fields,
     rgl,
     R.matlab
 LinkingTo:
     Rcpp,
     RcppArmadillo
 SystemRequirements: GNU make
-URL: https://github.com/ccclab-bigdata/jss-code
-BugReports: https://github.com/ccclab-bigdata/jss-code/issues
+URL: https://github.com/rigelfalcon/fastLPR
+BugReports: https://github.com/rigelfalcon/fastLPR/issues
 RoxygenNote: 7.3.1
 Roxygen: list(markdown = TRUE)

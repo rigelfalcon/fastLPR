@@ -11,11 +11,14 @@ Utility function to generate multi-dimensional grids.
   \item{x_min}{Minimum values per dimension.}
   \item{x_max}{Maximum values per dimension.}
   \item{N}{Grid size per dimension.}
-  \item{space}{Grid spacing: "linear" (default) or "log".}
-  \item{type}{Output type: "array" (default) or "meshgrid".}
+  \item{space}{Grid spacing: \code{"linear"} (default) or \code{"logspace"}.}
+  \item{type}{Output type: \code{"array"} (default) or \code{"cell"}.}
   \item{transpose}{Whether to transpose output (default: FALSE).}
 }
 \value{
 List of grid vectors.
 }
 \keyword{utilities}
+\examples{
+grid <- multispace(0, 1, 50)
+}

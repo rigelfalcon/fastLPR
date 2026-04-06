@@ -66,3 +66,6 @@ Thumbs.db
 *.tar.gz
 *.7z
 *.rar
+/backup
+/.spec-workflow
+/dev

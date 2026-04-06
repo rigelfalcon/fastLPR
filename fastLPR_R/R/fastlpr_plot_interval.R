@@ -89,7 +89,7 @@ fastlpr_plot_interval <- function(ci, col = "green", alpha = 0.2, add = TRUE, ..
       warning("rgl package not available, using persp() instead")
       # Use base graphics persp() - less interactive but always available
       persp(x1_grid, x2_grid, upper, col = col_trans, border = NA, ...)
-      persp(x1_grid, x2_grid, lower, col = col_trans, border = NA, add = TRUE, ...)
+      # Note: persp() does not support overlaying surfaces; lower bound omitted in base graphics
     } else {
       # Use rgl for interactive 3D - better but requires rgl
       if (!add) {

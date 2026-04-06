@@ -120,7 +120,7 @@ ComplexVector rcpp_fft_axis(ComplexVector arr, IntegerVector dims, int axis, boo
                     idx += base_sub[i] * strides[i];
                 }
             }
-            result[idx] = Rcomplex{fft_result(k).real(), fft_result(k).imag()};
+            result[idx] = Rcomplex{{fft_result(k).real(), fft_result(k).imag()}};
         }
     }
     
@@ -147,7 +147,7 @@ ComplexVector rcpp_fft_nd(ComplexVector arr, IntegerVector dims, bool inverse = 
 ComplexVector rcpp_fft_nd_real(NumericVector arr, IntegerVector dims, bool inverse = false) {
     ComplexVector carr(arr.size());
     for (int i = 0; i < arr.size(); ++i) {
-        carr[i] = Rcomplex{arr[i], 0.0};
+        carr[i] = Rcomplex{{arr[i], 0.0}};
     }
     carr.attr("dim") = dims;
     return rcpp_fft_nd(carr, dims, inverse);
@@ -315,7 +315,7 @@ ComplexVector rcpp_interp_nd_complex(List grid_vals, ComplexVector arr, NumericM
             value_i += weight * arr[idx].i;
         }
 
-        result[p] = Rcomplex{value_r, value_i};
+        result[p] = Rcomplex{{value_r, value_i}};
     }
 
     return result;
@@ -493,12 +493,12 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
     int n_query = query_points.nrow();
 
     if (query_points.ncol() != dx) {
-        stop("query_points must have %d columns (got %d)", dx, query_points.ncol());
+        stop("query_points must have %d columns (got %d)", dx, (int)query_points.ncol());
     }
 
     // Parse dimensions: [N1, N2, ..., Nd, n_bandwidth]
     if (dims.size() != dx + 1) {
-        stop("dims must have length dx + 1 (got %d, expected %d)", dims.size(), dx + 1);
+        stop("dims must have length dx + 1 (got %d, expected %d)", (int)dims.size(), dx + 1);
     }
 
     std::vector<int> N(dx);
@@ -512,7 +512,7 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
     // Validate values size
     size_t expected_size = N_total * n_bandwidth;
     if ((size_t)values.size() != expected_size) {
-        stop("values size mismatch: expected %d, got %d", expected_size, values.size());
+        stop("values size mismatch: expected %d, got %d", (int)expected_size, (int)values.size());
     }
 
     // Extract grid vectors into C++ vectors
@@ -520,7 +520,7 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
     for (int d = 0; d < dx; ++d) {
         NumericVector gv = grid_vectors[d];
         if ((int)gv.size() != N[d]) {
-            stop("grid_vectors[%d] size mismatch: expected %d, got %d", d, N[d], gv.size());
+            stop("grid_vectors[%d] size mismatch: expected %d, got %d", d, N[d], (int)gv.size());
         }
         grids[d] = std::vector<double>(gv.begin(), gv.end());
     }
@@ -573,7 +573,9 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
     // Loop over 2^dx corners for linear interpolation in any dimension
     int n_corners = 1 << dx;  // 2^dx corners
 
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(static)
+    #endif
     for (int h = 0; h < n_bandwidth; ++h) {
         // Offset into values array for this bandwidth
         size_t h_offset = (size_t)h * N_total;
@@ -639,14 +641,16 @@ ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh
                                 bool inverse = false) {
     size_t total = (size_t)n1 * n2 * n3 * dh;
     if ((size_t)arr.size() != total) {
-        stop("Array size mismatch: expected %d, got %d", total, arr.size());
+        stop("Array size mismatch: expected %d, got %d", (int)total, (int)arr.size());
     }
     
     ComplexVector result(total);
     size_t slice_size = (size_t)n1 * n2 * n3;
     
     // Process each bandwidth slice in parallel
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(dynamic)
+    #endif
     for (int h = 0; h < dh; ++h) {
         size_t offset = h * slice_size;
         
@@ -722,7 +726,7 @@ ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh
         
         // Copy result back
         for (size_t i = 0; i < slice_size; ++i) {
-            result[offset + i] = Rcomplex{buf[i].real(), buf[i].imag()};
+            result[offset + i] = Rcomplex{{buf[i].real(), buf[i].imag()}};
         }
     }
     
@@ -737,14 +741,16 @@ ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh
 // [[Rcpp::export]]
 ComplexVector rcpp_fft2d_batch(ComplexVector arr, int n1, int n2, int n_slices,
                                 bool inverse = false) {
-    size_t total = n1 * n2 * n_slices;
+    size_t total = (size_t)n1 * n2 * n_slices;
     if ((size_t)arr.size() != total) {
         stop("Array size does not match dimensions");
     }
     
     ComplexVector result(total);
     
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(dynamic)
+    #endif
     for (int s = 0; s < n_slices; ++s) {
         // Extract slice
         cx_mat slice(n1, n2);
@@ -768,7 +774,7 @@ ComplexVector rcpp_fft2d_batch(ComplexVector arr, int n1, int n2, int n_slices,
         for (int j = 0; j < n2; ++j) {
             for (int i = 0; i < n1; ++i) {
                 size_t idx = offset + i + j * n1;
-                result[idx] = Rcomplex{fft_result(i, j).real(), fft_result(i, j).imag()};
+                result[idx] = Rcomplex{{fft_result(i, j).real(), fft_result(i, j).imag()}};
             }
         }
     }
@@ -789,16 +795,18 @@ ComplexVector rcpp_fft2d_batch(ComplexVector arr, int n1, int n2, int n_slices,
 ComplexVector rcpp_broadcast_multiply(ComplexVector kdf, ComplexVector y_ft,
                                        int L, int dh, int dy) {
     if (kdf.size() != L * dh) {
-        stop("kdf size mismatch: expected %d, got %d", L * dh, kdf.size());
+        stop("kdf size mismatch: expected %d, got %d", (int)(L * dh), (int)kdf.size());
     }
     if (y_ft.size() != L * dy) {
-        stop("y_ft size mismatch: expected %d, got %d", L * dy, y_ft.size());
+        stop("y_ft size mismatch: expected %d, got %d", (int)(L * dy), (int)y_ft.size());
     }
     
     ComplexVector result(L * dh * dy);
     
     // Parallel over output: result[l, h, d] = kdf[l, h] * y_ft[l, d]
+    #ifdef _OPENMP
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int d = 0; d < dy; ++d) {
         for (int h = 0; h < dh; ++h) {
             for (int l = 0; l < L; ++l) {
@@ -811,7 +819,7 @@ ComplexVector rcpp_broadcast_multiply(ComplexVector kdf, ComplexVector y_ft,
                 std::complex<double> y(y_ft[y_idx].r, y_ft[y_idx].i);
                 std::complex<double> r = k * y;
                 
-                result[out_idx] = Rcomplex{r.real(), r.imag()};
+                result[out_idx] = Rcomplex{{r.real(), r.imag()}};
             }
         }
     }
@@ -868,7 +876,9 @@ NumericVector rcpp_extract_subarray(NumericVector arr, IntegerVector dims,
     NumericVector result(out_total);
     
     // Parallel extraction
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(static)
+    #endif
     for (int out_idx = 0; out_idx < out_total; ++out_idx) {
         // Convert linear index to subscripts
         int temp = out_idx;
@@ -928,10 +938,10 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
     
     // Validate input sizes
     if ((size_t)kdf.size() != L_total * dh) {
-        stop("kdf size mismatch: expected %d, got %d", L_total * dh, kdf.size());
+        stop("kdf size mismatch: expected %d, got %d", (int)(L_total * dh), (int)kdf.size());
     }
     if ((size_t)y_ft.size() != L_total * dy) {
-        stop("y_ft size mismatch: expected %d, got %d", L_total * dy, y_ft.size());
+        stop("y_ft size mismatch: expected %d, got %d", (int)(L_total * dy), (int)y_ft.size());
     }
     
     // Compute strides for L array (column-major)
@@ -953,7 +963,9 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
     ComplexVector result(out_total);
     
     // Process each (bandwidth, response) pair in parallel
+    #ifdef _OPENMP
     #pragma omp parallel for collapse(2) schedule(dynamic)
+    #endif
     for (int d_idx = 0; d_idx < dy; ++d_idx) {
         for (int h_idx = 0; h_idx < dh; ++h_idx) {
             // Allocate workspace for this thread
@@ -1048,9 +1060,9 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
                 size_t out_idx = out_s + h_idx * N_total + d_idx * N_total * dh;
                 
                 if (y_isreal) {
-                    result[out_idx] = Rcomplex{m_ft[in_idx].real(), 0.0};
+                    result[out_idx] = Rcomplex{{m_ft[in_idx].real(), 0.0}};
                 } else {
-                    result[out_idx] = Rcomplex{m_ft[in_idx].real(), m_ft[in_idx].imag()};
+                    result[out_idx] = Rcomplex{{m_ft[in_idx].real(), m_ft[in_idx].imag()}};
                 }
             }
         }
@@ -1118,7 +1130,9 @@ NumericVector rcpp_gaussian_kernel_grid(NumericVector xgrid, NumericMatrix h) {
     double norm_const = 1.0 / std::sqrt(2.0 * M_PI);
     
     // Process each bandwidth in parallel
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(dynamic)
+    #endif
     for (int ih = 0; ih < dh; ++ih) {
         double inv_deth = norm_const / deth[ih];
         
@@ -1225,12 +1239,16 @@ ComplexVector rcpp_nufft_type1(NumericMatrix knot, NumericMatrix y,
     // Process each data point (parallel over data points)
     // Use critical section for accumulation
     // NOTE: knots are PRE-SCALED to [0, 2*pi] by R's scale_knots() function
+    #ifdef _OPENMP
     #pragma omp parallel
+    #endif
     {
         // Thread-local accumulation buffer
         std::vector<std::complex<double>> local_Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
+        #ifdef _OPENMP
         #pragma omp for schedule(dynamic)
+        #endif
         for (int m = 0; m < M; ++m) {
             // Get position for this sample (already in [0, 2*pi] from scale_knots)
             std::vector<double> xmod(dx);
@@ -1283,7 +1301,9 @@ ComplexVector rcpp_nufft_type1(NumericMatrix knot, NumericMatrix y,
         }
 
         // Merge thread-local results
+        #ifdef _OPENMP
         #pragma omp critical
+        #endif
         {
             for (size_t i = 0; i < Mr_total * dy; ++i) {
                 Ftau[i] += local_Ftau[i];
@@ -1376,7 +1396,7 @@ ComplexVector rcpp_nufft_type1(NumericMatrix knot, NumericMatrix y,
             }
 
             size_t out_idx = out_s + d_y * L_total;
-            result[out_idx] = Rcomplex{Ftau[in_idx].real(), Ftau[in_idx].imag()};
+            result[out_idx] = Rcomplex{{Ftau[in_idx].real(), Ftau[in_idx].imag()}};
         }
     }
 
@@ -1472,12 +1492,16 @@ ComplexVector rcpp_nufft_type1_complex(NumericMatrix knot, ComplexMatrix y,
     // Process each data point (parallel over data points)
     // Use critical section for accumulation
     // NOTE: knots are PRE-SCALED to [0, 2*pi] by R's scale_knots() function
+    #ifdef _OPENMP
     #pragma omp parallel
+    #endif
     {
         // Thread-local accumulation buffer
         std::vector<std::complex<double>> local_Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
+        #ifdef _OPENMP
         #pragma omp for schedule(dynamic)
+        #endif
         for (int m = 0; m < M; ++m) {
             // Get position for this sample (already in [0, 2*pi] from scale_knots)
             std::vector<double> xmod(dx);
@@ -1531,7 +1555,9 @@ ComplexVector rcpp_nufft_type1_complex(NumericMatrix knot, ComplexMatrix y,
         }
 
         // Merge thread-local results
+        #ifdef _OPENMP
         #pragma omp critical
+        #endif
         {
             for (size_t i = 0; i < Mr_total * dy; ++i) {
                 Ftau[i] += local_Ftau[i];
@@ -1624,7 +1650,7 @@ ComplexVector rcpp_nufft_type1_complex(NumericMatrix knot, ComplexMatrix y,
             }
 
             size_t out_idx = out_s + d_y * L_total;
-            result[out_idx] = Rcomplex{Ftau[in_idx].real(), Ftau[in_idx].imag()};
+            result[out_idx] = Rcomplex{{Ftau[in_idx].real(), Ftau[in_idx].imag()}};
         }
     }
 
@@ -1672,12 +1698,16 @@ NumericMatrix rcpp_scale_knots(NumericMatrix knot, NumericVector N, NumericVecto
         double kmin = knot(0, d) * scale;
         double kmax = kmin;
         
+        #ifdef _OPENMP
         #pragma omp parallel
+        #endif
         {
             double local_min = kmin;
             double local_max = kmax;
             
+            #ifdef _OPENMP
             #pragma omp for nowait
+            #endif
             for (int i = 0; i < M; ++i) {
                 double val = knot(i, d) * scale;
                 result(i, d) = val;
@@ -1685,7 +1715,9 @@ NumericMatrix rcpp_scale_knots(NumericMatrix knot, NumericVector N, NumericVecto
                 if (val > local_max) local_max = val;
             }
             
+            #ifdef _OPENMP
             #pragma omp critical
+            #endif
             {
                 if (local_min < kmin) kmin = local_min;
                 if (local_max > kmax) kmax = local_max;
@@ -1699,7 +1731,9 @@ NumericMatrix rcpp_scale_knots(NumericMatrix knot, NumericVector N, NumericVecto
         // Second pass: shift and convert to [0, 2*pi]
         const double TWO_PI = 2.0 * M_PI;
         
+        #ifdef _OPENMP
         #pragma omp parallel for
+        #endif
         for (int i = 0; i < M; ++i) {
             double val = (result(i, d) + shift) * TWO_PI;
             // Modulo 2*pi (handle negative values)
@@ -1763,12 +1797,16 @@ ComplexVector rcpp_nufft_binning(NumericMatrix knot, NumericMatrix y,
     std::vector<std::complex<double>> Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
     // Parallel binning with thread-local accumulation
+    #ifdef _OPENMP
     #pragma omp parallel
+    #endif
     {
         // Thread-local accumulation buffer
         std::vector<std::complex<double>> local_Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
+        #ifdef _OPENMP
         #pragma omp for schedule(static)
+        #endif
         for (int m = 0; m < M; ++m) {
             // Compute grid index for this sample
             size_t grid_idx = 0;
@@ -1788,7 +1826,9 @@ ComplexVector rcpp_nufft_binning(NumericMatrix knot, NumericMatrix y,
         }
 
         // Merge thread-local results
+        #ifdef _OPENMP
         #pragma omp critical
+        #endif
         {
             for (size_t i = 0; i < Mr_total * dy; ++i) {
                 Ftau[i] += local_Ftau[i];
@@ -1799,7 +1839,7 @@ ComplexVector rcpp_nufft_binning(NumericMatrix knot, NumericMatrix y,
     // Convert to R ComplexVector
     ComplexVector result(Mr_total * dy);
     for (size_t i = 0; i < Mr_total * dy; ++i) {
-        result[i] = Rcomplex{Ftau[i].real(), Ftau[i].imag()};
+        result[i] = Rcomplex{{Ftau[i].real(), Ftau[i].imag()}};
     }
 
     // Set output dimensions: (Mr[0], Mr[1], ..., dy)
@@ -1851,11 +1891,15 @@ ComplexVector rcpp_nufft_binning_complex(NumericMatrix knot, ComplexMatrix y,
     std::vector<std::complex<double>> Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
     // Parallel binning with thread-local accumulation
+    #ifdef _OPENMP
     #pragma omp parallel
+    #endif
     {
         std::vector<std::complex<double>> local_Ftau(Mr_total * dy, std::complex<double>(0, 0));
 
+        #ifdef _OPENMP
         #pragma omp for schedule(static)
+        #endif
         for (int m = 0; m < M; ++m) {
             size_t grid_idx = 0;
             for (int d = 0; d < dx; ++d) {
@@ -1871,7 +1915,9 @@ ComplexVector rcpp_nufft_binning_complex(NumericMatrix knot, ComplexMatrix y,
             }
         }
 
+        #ifdef _OPENMP
         #pragma omp critical
+        #endif
         {
             for (size_t i = 0; i < Mr_total * dy; ++i) {
                 Ftau[i] += local_Ftau[i];
@@ -1881,7 +1927,7 @@ ComplexVector rcpp_nufft_binning_complex(NumericMatrix knot, ComplexMatrix y,
 
     ComplexVector result(Mr_total * dy);
     for (size_t i = 0; i < Mr_total * dy; ++i) {
-        result[i] = Rcomplex{Ftau[i].real(), Ftau[i].imag()};
+        result[i] = Rcomplex{{Ftau[i].real(), Ftau[i].imag()}};
     }
 
     IntegerVector out_dims(dx + 1);

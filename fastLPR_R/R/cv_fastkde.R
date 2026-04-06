@@ -219,7 +219,7 @@ cv_fastkde <- function(x, h = NULL, opt = NULL) {
     # Similar to fastlpr_gcv.m line 142
     id1se <- lcv_result$id1se
 
-    # FIX 2025-12-16: Create NEW interpolator with extracted values instead of
+    # Create NEW interpolator with extracted values instead of
     # modifying kde$fpp$Values in place. The old approach broke the closure
     # in kde$fpp$evaluate() due to R's copy-on-write semantics - the closure
     # would still reference the old interpolator with ALL bandwidths.
@@ -343,7 +343,7 @@ fastkde_lcv <- function(regs, x) {
   #   3D: (N1 x N2 x N3 x dh x dy)
   # Extract the dy=1 slice to get (Ng... x dh)
 
-  # GENERALIZED (2025-12): Extract dy=1 slice for any dx
+  # Extract dy=1 slice for any dx
   # yhat shape: (N1 x ... x Ndx x dh x dy) where dy=1 for KDE
   # Extract to get: (N1 x ... x Ndx x dh)
   yhat_dims <- dim(regs$yhat)
@@ -411,7 +411,7 @@ fastkde_lcv <- function(regs, x) {
   hsum <- rowSums(regs$h)
   valid_indices <- which(lcv_scores >= semax)
 
-  # DEBUG: Print 1-SE selection details
+  # Print 1-SE selection details (when debug mode enabled)
   if (getOption("fastlpr.debug", FALSE)) {
     cat("\n=== 1-SE RULE DEBUG ===\n")
     cat(sprintf("Max LCV index: %d\n", idmax))

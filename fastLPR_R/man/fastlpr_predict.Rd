@@ -18,3 +18,12 @@ Predicted response values.
 \code{\link{cv_fastlpr}}
 }
 \keyword{regression}
+\examples{
+\donttest{
+x <- matrix(runif(200), ncol = 1)
+y <- sin(2 * pi * x) + rnorm(200, sd = 0.2)
+fit <- cv_fastlpr(x, y)
+x_new <- matrix(seq(0, 1, length.out = 50), ncol = 1)
+yhat <- fastlpr_predict(fit, x_new)
+}
+}

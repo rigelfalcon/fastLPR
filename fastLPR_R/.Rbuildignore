@@ -50,6 +50,9 @@
 # Build artifacts
 ^.*\.tar\.gz$
 
+# Manuscript reproduction examples (not package examples)
+^inst/examples$
+
 # Documentation files not needed in package
 ^cran-comments\.md$
 
@@ -64,5 +67,4 @@
 ^src/.*\.o$
 
 # R CMD check output directory
-^\.\.Rcheck$
-^\.\*Rcheck$
+^.*\.Rcheck$

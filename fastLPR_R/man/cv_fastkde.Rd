@@ -21,3 +21,9 @@ KDE results list containing estimated density, evaluation grid, and LCV results.
 }
 \keyword{nonparametric}
 \keyword{density estimation}
+\examples{
+\donttest{
+x <- matrix(rnorm(200), ncol = 1)
+kde <- cv_fastkde(x)
+}
+}

@@ -16,3 +16,7 @@ Utility function to set a single default option field.
 Merged options list.
 }
 \keyword{utilities}
+\examples{
+opt <- list(order = 1)
+opt <- set_defaults(opt, "kernel", "gaussian")
+}

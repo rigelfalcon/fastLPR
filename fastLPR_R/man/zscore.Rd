@@ -14,3 +14,7 @@ Standardizes data to zero mean and unit variance.
 Standardized data with attributes for mean and standard deviation.
 }
 \keyword{utilities}
+\examples{
+result <- zscore(rnorm(100, mean = 5, sd = 2))
+mean(result$z)  # approximately 0
+}

@@ -23,14 +23,11 @@ utils::globalVariables(c(
   # Dynamic lookups in fastlpr_dof.R
   "dof_interpolate_batch",
   "rcpp_interp_batch_1d",
-  # Legacy functions in fastlpr.R (not yet implemented)
-  "fastkde_eval",
-  "fastlpr_compute_kdf",
-  "fastlpr_inufft",
   # Internal helper functions
   "interp_batch_1d",
   "interp_batch_2d",
-  "interp_batch_3d"
+  "interp_batch_3d",
+  "sub2ind"
 ))
 
 #' Generate fastlpr startup message
@@ -83,16 +80,16 @@ utils::globalVariables(c(
       if (!is.null(rcpp_status$error) && nzchar(rcpp_status$error)) {
         rcpp_detail <- paste0("\nRcpp error:\n  ", rcpp_status$error)
       }
-      stop(paste0(
-        "fastlpr: ERROR - Rcpp acceleration not available.\n",
+      msg <- paste0(
+        "fastlpr: WARNING - Rcpp acceleration not available.\n",
         "Rcpp is required for acceptable performance.",
         rcpp_detail,
         "\n\n",
         "Options:\n",
         "  1. Install Rcpp: install.packages('Rcpp')\n",
-        "  2. Compile fastlpr: See fastLPR_R/src/README.md\n",
-        "  3. Allow pure R fallback (SLOW): Sys.setenv(FASTLPR_ALLOW_PURE_R = '1')\n"
-      ))
+        "  2. Compile fastlpr: See src/README.md\n",
+        "  3. Allow pure R fallback (SLOW): Sys.setenv(FASTLPR_ALLOW_PURE_R = '1')"
+      )
     }
   }
 
@@ -109,7 +106,7 @@ utils::globalVariables(c(
 #' @param pkgname Package name
 #' @noRd
 .onLoad <- function(libname, pkgname) {
-  # CRITICAL: Disable JIT compilation to prevent 15+ second overhead
+  # Disable JIT compilation to prevent 15+ second overhead
   # Root cause: R's JIT (level 3) recompiles large closures in get_lwp_estimator()
   # on the second call, causing massive delays. Disabling JIT avoids this.
   # See: https://bugs.r-project.org/show_bug.cgi?id=18555
@@ -163,7 +160,7 @@ utils::globalVariables(c(
 #' Manually prints the Rcpp acceleration status. Useful when the package
 #' is loaded via source() rather than library().
 #'
-#' @export
+#' @noRd
 #' @examples
 #' \dontrun{
 #' fastlpr_startup()

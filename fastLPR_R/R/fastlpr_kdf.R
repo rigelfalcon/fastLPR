@@ -16,7 +16,7 @@ fastlpr_kdf <- function(x, h, N, opt) {
     h <- matrix((4 / (dx + 2) / Tx)^(1 / (dx + 4)), nrow = 1)
   } else if (!is.matrix(h)) {
     # Convert vector/scalar to matrix
-    # CRITICAL FIX (2025-11-21): Distinguish between two cases:
+    # Distinguish between two cases:
     # 1. Multiple bandwidths for CV (h is a vector of candidate bandwidths)
     #    -> Each element becomes a row, with dx columns (replicated if needed)
     # 2. Single bandwidth with dimension-specific values (h has length == dx)
@@ -79,6 +79,9 @@ fastlpr_kdf <- function(x, h, N, opt) {
   kernel_res <- get_local_polynomial_kernel(xgrid, h, opt$kernel_type, opt$order, dx, lwp)
   kd <- kernel_res$kd
   ihbad <- as.vector(kernel_res$ihbad)
+
+  # Guard against NA in ihbad (e.g., from NaN kernel values)
+  ihbad[is.na(ihbad)] <- TRUE
 
   # Remove bandwidths that are too small
 
@@ -279,7 +282,7 @@ kernel_function <- function(x, c = NULL, h, kernel_type) {
   # OPTIMIZATION v3.2: Use Rcpp kernel for grid format (eliminates array/aperm)
   # This provides massive speedup for 3D KDE (86ms -> <1ms)
   if (d > dx && kernel_type == "gaussian" && is.null(c)) {
-    # FIX 2025-12-14: Use get0() instead of exists() because exists() doesn't
+    # Use get0() instead of exists() because exists() doesn't
     # reliably find functions in the package namespace when called from within
     rcpp_kernel_fn <- tryCatch({
       fn <- get0("rcpp_gaussian_kernel_grid", envir = globalenv(), inherits = FALSE)
@@ -456,14 +459,14 @@ get_fourier_transformed_kernel_single <- function(kd, L, qin, dx) {
 
 
   # Copy data to padded array using generalized N-D indexing
-  # CRITICAL FIX (2025-12-03): Match MATLAB's padarray behavior
+  # Match MATLAB's padarray behavior
   # MATLAB: kd = padarray(kd, qin(1,:), 0, 'pre') - adds qin(1,:) zeros BEFORE
   #         So data starts at index qin(1,:) + 1
   # qin[1,d] = pad_left + 1 = amount of padding + 1
   # qin[2,d] = pad_left + N = end of padding + N
   # Data goes from (qin[1,d]+1) to (qin[2,d]+1) to match MATLAB's padarray
   #
-  # GENERALIZED (2025-12): Works for any dx from 1 to 10
+  # Works for any dx from 1 to 10
   # Build dynamic index list for spatial dimensions
   idx_list <- lapply(1:dx, function(d) (qin[1, d]+1):(qin[2, d]+1))
 

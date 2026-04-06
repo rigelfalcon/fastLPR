@@ -27,14 +27,10 @@ export(is_fastlpr_result)
 export(is_fastkde_result)
 
 # Import required functions
-importFrom("stats", "sd", "var", "quantile", "dnorm", "fft", "runif", "bw.nrd0", "mvfft", "qnorm", "rnorm")
-importFrom("utils", "head", "tail", "combn")
-importFrom("grDevices", "dev.off", "png", "pdf", "col2rgb", "heat.colors", "rgb", "terrain.colors")
-importFrom("graphics", "plot", "lines", "points", "legend", "title", "axis", "filled.contour", "persp", "plot.new", "polygon", "text")
-importFrom("methods", "new", "validObject")
-
-# Import Matrix for sparse operations
-importFrom("Matrix", "sparseMatrix")
+importFrom("stats", "sd", "var", "quantile", "fft", "runif", "bw.nrd0", "mvfft", "qnorm", "rnorm", "approxfun")
+importFrom("utils", "head", "tail")
+importFrom("grDevices", "col2rgb", "heat.colors", "rgb", "terrain.colors")
+importFrom("graphics", "plot", "lines", "points", "legend", "title", "filled.contour", "persp", "plot.new", "polygon", "text", "grid", "image")
 
 # S3 methods
 S3method(print, fastlpr_result)

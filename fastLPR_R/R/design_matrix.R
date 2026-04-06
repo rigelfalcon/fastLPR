@@ -13,7 +13,7 @@
 #' MATLAB's ifft works on all columns (bandwidths) simultaneously.
 #'
 #' @section IMPORTANT - DO NOT "OPTIMIZE" WITH RCPP FFT:
-#' Benchmark results (2025-12-28, N=1M complex):
+#' Benchmark results (N=1M complex):
 #'
 #' | Backend            | Time    | Notes                              |
 #' |--------------------|---------|-------------------------------------|
@@ -298,41 +298,4 @@ apply_fft_axis <- function(arr, axis, inverse = FALSE) {
 #'          .kdf      - Kernel density function in Fourier domain
 #'          .lwp.ns   - Number of design matrix elements (for order >= 1)
 #'
-#' @return regs Updated regression structure with:
-#'          .s - Design matrix elements
-#'               Order 0: scalar (sum of weights)
-#'               Order >= 1: cell array of ns elements
-#'
-#' @noRd
-fastlpr_s <- function(regs) {
-  # Create vector of ones for convolution (represents constant function)
-  Is <- matrix(1, nrow = regs$Tx, ncol = 1)
-
-  if (regs$opt$order == 0) {
-    # Order 0: Nadaraya-Watson estimator
-    # S = sum of kernel weights at each evaluation point
-    # Add eps for numerical stability (prevents division by zero)
-    s_raw <- fastlpr_conv(regs, regs$kdf, Is, FALSE)
-    regs$s <- s_raw + .Machine$double.eps
-  } else if (regs$opt$order == 1) {
-    # Order 1: Local linear regression
-    # Compute each element of the design matrix S via convolution
-    # S has ns unique elements (lower triangular due to symmetry)
-    regs$s <- list()
-    for (i in 1:regs$lwp$ns) {
-      regs$s[[i]] <- fastlpr_conv(regs, regs$kdf[[i]], Is, FALSE)
-    }
-  } else if (regs$opt$order == 2) {
-    # Order 2: Local quadratic regression
-    # Compute each element of the design matrix S via convolution
-    # S has ns unique elements (lower triangular due to symmetry)
-    regs$s <- list()
-    for (i in 1:regs$lwp$ns) {
-      regs$s[[i]] <- fastlpr_conv(regs, regs$kdf[[i]], Is, FALSE)
-    }
-  } else {
-    stop("Unknown polynomial order: ", regs$opt$order)
-  }
-
-  return(regs)
-}
+# NOTE: fastlpr_s() is defined in fastlpr_s.R (removed duplicate from here)

@@ -67,7 +67,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
   dy <- regs$dy
 
   # ==========================================================================
-  # FIX 2025-12-01: Support external random vectors for exact reproducibility
+  # Support external random vectors for exact reproducibility
   # If regs$opt$dof_random_vectors is provided (e.g., from MATLAB reference file),
   # use those exact vectors instead of generating new ones.
   # This enables exact matching between R and MATLAB DOF computations.
@@ -108,10 +108,9 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
   # Recomputing s for random vectors p was the bug causing 47x underestimation.
   #
   # MATLAB (correct): mq = fastLPR_reg(regs, p)  # Uses precomputed regs.s
-  # R (was wrong): regs_temp$s <- NULL; regs_temp <- fastlpr_s(regs_temp)  # Recomputed s
   # R (now correct): Just call fastlpr_reg with original regs and new response p
   #
-  # FIX 2025-12-04: Temporarily set y_isreal=TRUE for DOF computation
+  # Set y_isreal=TRUE for DOF computation (DOF does not depend on response values)
   # The random probe vectors p are ALWAYS real, so the output should be real.
   # But regs$y_isreal might be FALSE if original data y was complex.
   # This prevents unnecessary complex computations and allows Rcpp interpolation.
@@ -147,7 +146,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
     }
   } else {
     # 3D or higher: flatten to 2D
-    # OPTIMIZATION v5 (2025-12-04): Use aperm + matrix instead of loop
+    # Use aperm + matrix instead of loop
     # R's fastlpr_reg returns 3D array (Ng, dh, num_samples)
     # MATLAB returns 2D (flattened) with columns ordered as (dh1, dh2, ..., dhN, sample1, sample2, ...)
     # We need to convert (Ng, dh, num_samples) -> (Ng, dh*num_samples)
@@ -176,7 +175,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
     use_rcpp <- regs$opt$use_rcpp && requireNamespace("Rcpp", quietly = TRUE)
   } else {
     # Auto-detect: Use Rcpp if available and many bandwidths
-    # FIX 2025-12-14: Use get0() instead of exists() because exists() doesn't
+    # Use get0() instead of exists() because exists() doesn't
     # reliably find functions in the package namespace when called from within
     dof_interp_batch_fn <- tryCatch({
       fn <- get0("dof_interpolate_batch", envir = globalenv(), inherits = FALSE)
@@ -266,7 +265,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
   pdof <- pmax(0, pmin(1, pdof))
   dim(pdof) <- pdof_dims  # Restore matrix dimensions
 
-  # FIX 2025-12-01: Complex-valued responses need 2x DOF adjustment
+  # Complex-valued responses need 2x DOF adjustment
   # MATLAB code:
   #   if ~regs.y_isreal
   #       pdof(:,:,~regs.y_isreal)=2*pdof(:,:,~regs.y_isreal)-1;
@@ -280,7 +279,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
     dim(pdof) <- pdof_dims
   }
 
-  # CRITICAL FIX (2025-11-21): Compute df from CLAMPED pdof
+  # Compute df from CLAMPED pdof
   # When pdof > 1.0, this caused negative df values - compute df AFTER clamping
   df <- Tx * (1 - pdof)
 

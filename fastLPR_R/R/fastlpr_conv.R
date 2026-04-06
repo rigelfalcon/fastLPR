@@ -45,7 +45,7 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
 
   # Determine if y is already Fourier-transformed
   if (is.null(flag_transformed)) {
-    # FIX 2025-12-18 v2: Robust detection of whether y is already transformed
+    # Robust detection of whether y is already transformed
     #
     # Key insight: Raw data y ALWAYS has shape (Tx, dy) where:
     #   - Tx = number of samples (can be ANY value)
@@ -143,7 +143,7 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
     # OPTIMIZATION v3.1: Use dimension-agnostic Rcpp convolution pipeline
     # Handles ANY dimension (1D, 2D, 3D, etc.) like MATLAB's code:
     #   for ix = regs.dx:-1:1; m = ifft(m, [], ix); end
-    # FIX 2025-12-14: Use get0() instead of exists() because exists() doesn't
+    # Use get0() instead of exists() because exists() doesn't
     # reliably find functions in the package namespace when called from within
     rcpp_conv_nd_fn <- tryCatch({
       fn <- get0("rcpp_conv_nd_full", envir = globalenv(), inherits = FALSE)
@@ -197,7 +197,7 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
     y_ft_broadcast <- array(0+0i, dim = target_dims)
 
     # OPTIMIZATION v2.1: Use Rcpp broadcast multiply with OpenMP if available
-    # FIX 2025-12-14: Use get0() instead of exists() because exists() doesn't
+    # Use get0() instead of exists() because exists() doesn't
     # reliably find functions in the package namespace when called from within
     rcpp_broadcast_1d_fn <- tryCatch({
       fn <- get0("rcpp_broadcast_multiply", envir = globalenv(), inherits = FALSE)
@@ -256,7 +256,7 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
   } else {
     # y is already in Fourier domain
     if (!regs$opt$y_corr_bandwidth) {
-      # FIX 2025-12-18: Handle 2D y (L, dy) properly for ALL dimensions
+      # Handle 2D y (L, dy) properly for ALL dimensions
       # When flag_transformed=TRUE (Ny == L), y has shape (L, dy) not (L, dh, dy)
       # This happens when regs$Tx == regs$L (sample size equals padded grid size)
       y_dims <- dim(y)

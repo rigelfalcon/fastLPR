@@ -1,7 +1,7 @@
 # fastlpr: Fast Local Polynomial Regression for R
 
-[![R package](https://img.shields.io/badge/R-package-source--available-blue)](../README.md)
-[![License: GPL-3](https://img.shields.io/badge/License-GPL--3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![R package](https://img.shields.io/badge/R-package-source--available-blue)](https://github.com/rigelfalcon/fastLPR)
+[![License: GPL-3](https://img.shields.io/badge/License-GPL--3-blue.svg)](https://opensource.org/licenses/GPL-3.0)
 
 NUFFT-accelerated local polynomial regression and kernel density estimation for R.
 This is the R port of the fastLPR MATLAB/Python toolbox, achieving O(N + M log M)
@@ -248,5 +248,5 @@ GPL-3
 
 ## Related Packages
 
-- [fastLPR (MATLAB)](https://github.com/fastlpr/fastlpr-matlab) - Reference implementation
-- [fastlpr (Python)](https://github.com/fastlpr/fastlpr-python) - Python port
+- [fastLPR (MATLAB)](https://github.com/rigelfalcon/fastLPR) - Reference implementation
+- [fastlpr (Python)](https://github.com/rigelfalcon/fastLPR) - Python port

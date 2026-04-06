@@ -119,7 +119,7 @@ vec2tril <- function(v) {
 #' Helper function to compute polynomial terms for design matrix.
 #' Mirrors the symbolic computation in MATLAB's get_lwp_estimator.m
 #'
-#' CRITICAL MATLAB COMPATIBILITY NOTE:
+#' MATLAB COMPATIBILITY NOTE:
 #' MATLAB's Sxfun uses xgrid(:,:,d) indexing on a 4D array [N1, N2, dx, dh],
 #' which extracts only the FIRST bandwidth's coordinates [N1, N2], NOT all bandwidths.
 #' The result is then broadcast across all bandwidths when multiplied with kd.
@@ -161,7 +161,7 @@ get_polynomial_terms_from_grid <- function(xgrid, order, dx) {
     if (dx == 1) {
       # For 1D: xgrid can be (N x 1) or (N x dh)
       #
-      # CRITICAL FIX 2025-12-01: For multi-bandwidth case, we need to keep ALL columns!
+      # For multi-bandwidth case, we need to keep ALL columns!
       # Each column has coordinates normalized by a different bandwidth.
       # kd[i,j] must be multiplied by xgrid_norm[i,j] (same j), not xgrid_norm[i,1]!
       #
@@ -184,7 +184,7 @@ get_polynomial_terms_from_grid <- function(xgrid, order, dx) {
       if (has_dh_dim) {
         # xgrid: (N1, N2, ..., dx, dh)
         #
-        # CRITICAL FIX 2025-12-01: For multi-bandwidth case, we need to keep ALL bandwidths!
+        # For multi-bandwidth case, we need to keep ALL bandwidths!
         # Each bandwidth has DIFFERENT normalized coordinates: xgrid_norm[i,j,d,h] = grid[i,j,d] / h[h,d]
         # We need: xgrid[:, :, ..., d, :] -> (N1, N2, ..., dh) (ALL bandwidths)
         #
@@ -273,7 +273,7 @@ get_polynomial_terms_from_grid <- function(xgrid, order, dx) {
 # ============================================================================
 # TOP-LEVEL FUNCTIONS FOR JIT EFFICIENCY
 # ============================================================================
-# CRITICAL FIX (2025-12-14): Move mfun computation outside get_lwp_estimator
+# Move mfun computation outside get_lwp_estimator
 # R's JIT compiler has trouble with closures, causing 16+ second delay on
 # the second call to mfun (when computing DOF). By making the heavy computation
 # a top-level function, the JIT compiler can handle it efficiently.
@@ -402,7 +402,7 @@ complex_sign <- function(x) {
 # ============================================================================
 # This top-level function avoids R JIT recompilation overhead on closures.
 # The mfun closure in get_lwp_estimator() is now a thin wrapper calling this.
-# FIX 2025-12: Moved from closure to avoid 16+ second JIT delays on DOF computation.
+# Moved from closure to avoid 16+ second JIT delays on DOF computation.
 # ============================================================================
 .mfun_internal <- function(S, T, order, dx, regularization = 0) {
   # Broadcasting preparation (uses top-level function)
@@ -468,7 +468,7 @@ complex_sign <- function(x) {
   }
 
   # ORDER 2, 2D: Delegate to legacy - formula is too complex to duplicate
-  # This is a temporary fallback until fully migrated
+  # Standalone function to avoid closure overhead
   stop(sprintf(".mfun_internal: Unsupported dx=%d, order=%d (ORDER 2,2D not migrated)", dx, order))
 }
 

@@ -13,7 +13,17 @@ Visualizes kernel density estimation results.
   \item{n_points}{Number of points for plotting (default: 1000).}
   \item{...}{Additional plotting parameters.}
 }
+\value{
+Called for its side effect (plotting). Returns \code{NULL} invisibly.
+}
 \seealso{
 \code{\link{cv_fastkde}}
 }
 \keyword{hplot}
+\examples{
+\donttest{
+x <- matrix(rnorm(200), ncol = 1)
+kde <- cv_fastkde(x)
+fastkde_plot(kde$fpp)
+}
+}

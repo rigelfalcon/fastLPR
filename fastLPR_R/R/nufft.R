@@ -201,7 +201,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
   rcpp_binning_available <- is.function(rcpp_binning_fn)
   rcpp_binning_complex_available <- is.function(rcpp_binning_complex_fn)
 
-  # v3.11 (2025-12-16): RE-ENABLE Rcpp NUFFT after fixing all algorithmic bugs:
+  # RE-ENABLE Rcpp NUFFT after fixing all algorithmic bugs:
   # - Fixed tau formula: now uses ratio*(ratio-0.5) in denominator
   # - Fixed hx formula: now uses 2*pi/Mr instead of 1/Mr
   # - Fixed coordinate system: expects pre-scaled knots in [0, 2*pi]
@@ -209,7 +209,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
   y_is_complex <- is.complex(y)
   use_rcpp_real <- rcpp_nufft_available && !y_is_complex && acc > 0
   use_rcpp_complex <- rcpp_nufft_complex_available && y_is_complex && acc > 0
-  # v3.12 (2026-01-10): Enable Rcpp binning for accuracy=0 mode
+  # Enable Rcpp binning for accuracy=0 mode
   use_rcpp_binning <- rcpp_binning_available && !y_is_complex && acc == 0
   use_rcpp_binning_complex <- rcpp_binning_complex_available && y_is_complex && acc == 0
 
@@ -288,7 +288,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
       Fs <- N
     }
 
-    # FIX 2025-12-16: Scale knots BEFORE passing to C++ (matching Pure R algorithm)
+    # Scale knots BEFORE passing to C++ (matching Pure R algorithm)
     x_scaled <- scale_knots(x, N, Fs)
 
       # Try Rcpp NUFFT with pre-scaled knots
@@ -343,7 +343,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
             result <- sweep(result, 1, Kninv, `*`)
           } else {
             if (dy == 1) {
-              # FIX 2025-12-14: Rcpp result has dim (N[1], N[2], dy) even when dy=1
+              # Rcpp result has dim (N[1], N[2], dy) even when dy=1
               # So Kninv_array must include the dy dimension to be conformable
               Kninv_array <- array(Kninv, dim = c(N, dy))
               result <- result * Kninv_array
@@ -406,7 +406,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
     hx <- 2 * pi / Mr
     xmod <- scale_knots(x, N, Fs)
 
-    # v3.12 (2026-01-10): Use Rcpp binning for performance (5x faster than R loops)
+    # Use Rcpp binning for performance (5x faster than R loops)
     if (use_rcpp_binning || use_rcpp_binning_complex) {
       Ftau <- tryCatch({
         if (use_rcpp_binning_complex) {
@@ -804,7 +804,7 @@ nufftn_type1 <- function(x, y, Fs = matrix(), df = numeric(), iflag = -1,
     } else {
       # For multi-D, Kninv is a vector of length prod(N)
       # but Yq has shape (N[1], N[2], ..., N[dx], dy)
-      # FIX 2025-12-14: Yq has dim (N[1], N[2], dy) even for dy=1
+      # Yq has dim (N[1], N[2], dy) even for dy=1
       # So Kninv_array must have matching dimension
       if (dy == 1) {
         # Single response - Kninv_array must include dy dimension

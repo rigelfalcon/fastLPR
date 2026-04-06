@@ -457,7 +457,7 @@ get_hlist <- function(n, range, spacing = "logspace") {
 fastlpr_gridinterp <- function(regs, values, xlist = NULL, method = "griddedInterpolant", opt = NULL) {
   if (is.null(xlist)) xlist <- regs$xlist
   if (is.null(opt)) {
-    # FIX 2025-12-14: Default to "linear" to match MATLAB's griddedInterpolant('linear')
+    # Default to "linear" to match MATLAB's griddedInterpolant('linear')
     # Previously defaulted to "spline" which caused 2D regression divergence (287% GCV error)
     opt <- list(
       Method = "linear",
@@ -700,6 +700,9 @@ fastlpr_interpolator_eval_spline <- function(interp, x_new, n_bandwidth, grid_si
 
   } else if (dx == 2) {
     # 2D spline: akima::bicubic
+    if (!requireNamespace("akima", quietly = TRUE)) {
+      stop("Package 'akima' is required for 2D spline interpolation. Install with: install.packages('akima')")
+    }
     interp_2d_spline <- function(vals_mat) {
       akima::bicubic(x = grid_list[[1]], y = grid_list[[2]], z = vals_mat,
                      x0 = x_new[, 1], y0 = x_new[, 2])$z
@@ -869,7 +872,7 @@ fastlpr_bit_convert <- function(accuracy, ...) {
 
   # In R, just ensure everything is numeric (double precision)
   # R doesn't have true single precision like MATLAB
-  # CRITICAL FIX: Preserve matrix/array structure (as.double drops dimensions)
+  # Preserve matrix/array structure (as.double drops dimensions)
   result <- lapply(args, function(x) {
     if (is.numeric(x)) {
       if (is.matrix(x) || is.array(x)) {
@@ -1086,7 +1089,7 @@ interp_nd_tensor <- function(grid_list, values, x_query) {
   dx <- length(grid_list)
   n_query <- nrow(x_query)
 
-  # FIX 2025-12-15: Removed dx<=3 special case that called interp_batch_fast
+  # Removed dx<=3 special case that called interp_batch_fast
   # This was causing infinite mutual recursion:
   #   interp_batch_fast -> interp_nd_tensor -> interp_batch_fast -> ...
   # Now always use tensor product interpolation via interp_point_nd
