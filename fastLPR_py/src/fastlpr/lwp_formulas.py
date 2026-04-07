@@ -438,9 +438,9 @@ def _lwp_2d_order2_real(s: List[np.ndarray], t: List[np.ndarray]) -> np.ndarray:
     )
 
     if not os.path.exists(formula_file):
-        raise NotImplementedError(
-            "2D order-2 local polynomial regression is not yet supported. "
-            "Use order=0 (Nadaraya-Watson) or order=1 (local linear) for 2D data."
+        raise FileNotFoundError(
+            f"2D order-2 formula file not found: {formula_file}. "
+            "Reinstall the package or use order=0/1 for 2D data."
         )
 
     with open(formula_file, "r") as f:

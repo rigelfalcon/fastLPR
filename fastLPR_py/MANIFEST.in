@@ -1,4 +1,4 @@
 include LICENSE
 include README.md
 include CHANGELOG.md
-recursive-include src/fastlpr *.py *.pyx *.pxd py.typed
+recursive-include src/fastlpr *.py *.pyx *.pxd *.txt py.typed
