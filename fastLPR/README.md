@@ -20,13 +20,13 @@
 ### Option 1: Quick Setup
 ```matlab
 cd fastLPR
-fastLPR_setup();
+fastlpr_setup();
 ```
 
 ### Option 2: Toolbox Installer
 ```matlab
 cd fastLPR
-install_fastLPR();  % Prompts to save path
+install_fastlpr();  % Prompts to save path
 ```
 
 ### Verify Installation

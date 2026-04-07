@@ -1,4 +1,4 @@
-function install_fastLPR(varargin)
+function install_fastlpr(varargin)
 %INSTALL_FASTLPR Install fastLPR toolbox
 %   INSTALL_FASTLPR adds the fastLPR toolbox to the MATLAB path and optionally
 %   saves the path for future sessions.
@@ -18,7 +18,7 @@ function install_fastLPR(varargin)
 %
 %   Example:
 %       cd fastLPR
-%       install_fastLPR
+%       install_fastlpr
 %       help fastLPR
 %       ver fastLPR
 %
@@ -93,7 +93,7 @@ function install_fastLPR(varargin)
             fprintf('fastLPR will be available in future MATLAB sessions.\n');
         catch ME
             warning('Failed to save path: %s', ME.message);
-            fprintf('You may need to run install_fastLPR again in future sessions.\n');
+            fprintf('You may need to run install_fastlpr again in future sessions.\n');
         end
     else
         if ~interactive
@@ -101,7 +101,7 @@ function install_fastLPR(varargin)
         else
             fprintf('Path not saved.\n');
         end
-        fprintf('You will need to run install_fastLPR or fastlpr_setup in future sessions.\n');
+        fprintf('You will need to run install_fastlpr or fastlpr_setup in future sessions.\n');
     end
 
     fprintf('\n=============================================================\n');
