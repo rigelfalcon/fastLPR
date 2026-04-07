@@ -74,7 +74,7 @@ setup(
     version="1.0.0",
     description="Fast Local Polynomial Regression and Kernel Density Estimation using NUFFT",
     author="Ying Wang, Min Li",
-    author_email="",
+    author_email="yingwangrigel@gmail.com",
     license="GPL-3.0-or-later",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
@@ -84,10 +84,10 @@ setup(
     install_requires=[
         "numpy>=1.23",
         "scipy>=1.10",
-        "matplotlib>=3.7",
     ],
     extras_require={
-        "accel": ["cython>=3.0", "numba>=0.57"],
+        "plot": ["matplotlib>=3.7"],
+        "accel": ["cython>=3.0", "numba>=0.57", "psutil>=5.9"],
         "dev": ["pytest>=7.4", "pytest-cov>=4.1", "black>=23.7", "ruff>=0.1.6", "mypy>=1.5"],
         "docs": ["sphinx>=7.0", "furo>=2023.9.10"],
     },

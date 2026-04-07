@@ -1,4 +1,4 @@
-﻿function [regs] = cv_fastlpr(x, y, h, opt)
+function [regs] = cv_fastlpr(x, y, h, opt)
 % CV_FASTLPR - Fast Local Polynomial Regression with automatic bandwidth selection
 %
 % This is the main function for fastLPR toolbox. It performs nonparametric

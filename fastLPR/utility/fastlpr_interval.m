@@ -115,7 +115,8 @@ end
 nu = nu_table(nu_key);
 
 %% Compute z-score
-z = norminv(1 - alpha/2);
+% Compute z-score without Statistics Toolbox (norminv replacement)
+z = sqrt(2) * erfinv(2*(1 - alpha/2) - 1);
 
 %% Get mu, sigma, and s_0 values on the grid
 mu_val = mu.fpp_yhat.Values;

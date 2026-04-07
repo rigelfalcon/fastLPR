@@ -54,6 +54,9 @@ function install_fastLPR(varargin)
     fprintf('  - %s (public API)\n', fullfile(install_dir, 'utility'));
     addpath(fullfile(install_dir, 'utility'));
 
+    fprintf('  - %s (core functions)\n', fullfile(install_dir, 'utility', 'core'));
+    addpath(fullfile(install_dir, 'utility', 'core'));
+
     fprintf('  - %s (examples)\n', fullfile(install_dir, 'example'));
     addpath(fullfile(install_dir, 'example'));
 

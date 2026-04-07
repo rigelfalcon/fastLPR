@@ -410,8 +410,10 @@ def cv_fastlpr(
 
     num_removed = len(model.bandwidths) - dh_filtered
     if num_removed > 0:
-        print(
-            f"Warning: {num_removed} bandwidth(s) are too small for this grid and will be removed"
+        import warnings
+        warnings.warn(
+            f"{num_removed} bandwidth(s) are too small for this grid and will be removed",
+            stacklevel=2,
         )
 
     # FAST PATH: When calc_dof=False, skip DOF and GCV computation

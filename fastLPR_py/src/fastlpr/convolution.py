@@ -564,8 +564,10 @@ def compute_kernel_fourier(
 
     # Remove bad bandwidths
     if np.any(ihbad) and not np.all(ihbad):
-        print(
-            f"Warning: {np.sum(ihbad)} bandwidth(s) are too small for this grid and will be removed"
+        import warnings
+        warnings.warn(
+            f"{np.sum(ihbad)} bandwidth(s) are too small for this grid and will be removed",
+            stacklevel=2,
         )
         if order == 0:
             kd = kd[..., ~ihbad]
@@ -576,8 +578,10 @@ def compute_kernel_fourier(
     elif np.all(ihbad):
         # All bandwidths too small, use Silverman's rule
         h_silverman = (4.0 / (dims + 2) / N) ** (1.0 / (dims + 4))
-        print(
-            f"Warning: All bandwidths too small. Using Silverman's rule: h = {h_silverman:.4f}"
+        import warnings
+        warnings.warn(
+            f"All bandwidths too small. Using Silverman's rule: h = {h_silverman:.4f}",
+            stacklevel=2,
         )
         h = np.array([[h_silverman] * dims])
         # Recompute kernel with new bandwidth

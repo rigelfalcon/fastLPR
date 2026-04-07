@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "fastlpr"
 version = "1.0.0"
 description = "Fast Local Polynomial Regression and Kernel Density Estimation using NUFFT"
-authors = [{ name = "Ying Wang" }, { name = "Min Li" }]
-maintainers = [{ name = "fastLPR Development Team" }]
+authors = [{ name = "Ying Wang", email = "yingwangrigel@gmail.com" }, { name = "Min Li", email = "minli.231314@gmail.com" }]
+maintainers = [{ name = "Ying Wang", email = "yingwangrigel@gmail.com" }]
 requires-python = ">=3.9,<3.14"
 license = { text = "GPL-3.0-or-later" }
 readme = "README.md"
-dependencies = ["numpy>=1.23", "scipy>=1.10", "matplotlib>=3.7", "cython>=3.0", "numba>=0.57", "psutil>=5.9"]
+dependencies = ["numpy>=1.23", "scipy>=1.10"]
 keywords = [
     "nonparametric regression",
     "kernel density estimation",
@@ -53,9 +53,11 @@ dev = [
     "mypy>=1.5",
 ]
 docs = ["sphinx>=7.0", "furo>=2023.9.10"]
+plot = ["matplotlib>=3.7"]
 accel = [
     "cython>=3.0",
     "numba>=0.57",
+    "psutil>=5.9",
 ]
 
 [project.urls]
@@ -64,8 +66,10 @@ Repository = "https://github.com/rigelfalcon/fastLPR"
 Documentation = "https://github.com/rigelfalcon/fastLPR/tree/main/fastLPR_py"
 "Bug Tracker" = "https://github.com/rigelfalcon/fastLPR/issues"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools]
-packages = ["fastlpr"]
 package-dir = { "" = "src" }
 
 [tool.pytest.ini_options]

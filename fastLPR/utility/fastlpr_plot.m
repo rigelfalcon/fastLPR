@@ -1,4 +1,4 @@
-﻿function varargout = fastlpr_plot(fpp, x, N, opt, varargin)
+function varargout = fastlpr_plot(fpp, x, N, opt, varargin)
 % FASTLPR_PLOT - Visualize regression results from fastLPR
 %
 % This function creates publication-quality visualizations of local polynomial

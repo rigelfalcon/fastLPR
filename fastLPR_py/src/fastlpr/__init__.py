@@ -73,11 +73,27 @@ if not _os.environ.get("FASTLPR_QUIET"):
 from .api import cv_fastkde, cv_fastlpr
 from .bandwidth import get_hlist
 from .caching import clear_fastlpr_caches, get_cache_stats
-from .confidence import fastlpr_interval, fastlpr_plot_interval
-from .kde_plotting import fastkde_plot, fastkde_plot_bandwidth
-from .plotting import fastlpr_plot
+from .confidence import fastlpr_interval
 from .predict import fastlpr_predict
 from .structures import KDEOutput, RegressionOutput
+
+
+# Lazy imports for plotting functions (avoid forcing matplotlib at import time)
+def __getattr__(name):
+    _lazy = {
+        "fastlpr_plot": (".plotting", "fastlpr_plot"),
+        "fastlpr_plot_interval": (".confidence", "fastlpr_plot_interval"),
+        "fastkde_plot": (".kde_plotting", "fastkde_plot"),
+        "fastkde_plot_bandwidth": (".kde_plotting", "fastkde_plot_bandwidth"),
+    }
+    if name in _lazy:
+        module_path, attr = _lazy[name]
+        import importlib
+        mod = importlib.import_module(module_path, __package__)
+        val = getattr(mod, attr)
+        globals()[name] = val  # cache for subsequent access
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # =============================================================================
 # Internal imports - Available for advanced users but not in __all__

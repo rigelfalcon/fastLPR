@@ -1,4 +1,4 @@
-﻿function run_tests()
+function run_tests()
 %RUN_TESTS Execute the full fastLPR MATLAB test suite using matlab.unittest.
 %
 %   Usage (from repo root):

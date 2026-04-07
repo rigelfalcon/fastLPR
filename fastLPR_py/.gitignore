@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+*.so
+*.pyd
+*.c
+!src/fastlpr/_nufft_accel.pyx
+.eggs/
+*.whl

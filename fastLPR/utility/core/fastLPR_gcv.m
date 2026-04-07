@@ -183,12 +183,14 @@ pdof_m_1se=reshape(regs.pdof_m(id1segood,iy),1,[]);
 df_m_min=reshape(regs.df_m(idmingood),1,[]);
 df_m_1se=reshape(regs.df_m(id1segood),1,[]);
 
-%% Display selected bandwidths
-for iy=1:dy
-    disp(['[nw_nufft]: [',num2str(regs.dx),'d] regression with order ',num2str(regs.opt.order) ])
-    disp([' - selected bandwidth - [',num2str(find(ismember(regs.h, h1se(:,iy).','row'))),'th] h'])
-    disp([' - normalized scale h =[',num2str(h1se(:,iy)'),']'])
-    disp([' - original scale h =[',num2str(h1se(:,iy)'.*regs.x_std),']'])
+%% Display selected bandwidths (verbose only)
+if isfield(regs.opt, 'verbose') && regs.opt.verbose
+    for iy=1:dy
+        disp(['[fastlpr]: [',num2str(regs.dx),'d] regression with order ',num2str(regs.opt.order) ])
+        disp([' - selected bandwidth - [',num2str(find(ismember(regs.h, h1se(:,iy).','row'))),'th] h'])
+        disp([' - normalized scale h =[',num2str(h1se(:,iy)'),']'])
+        disp([' - original scale h =[',num2str(h1se(:,iy)'.*regs.x_std),']'])
+    end
 end
 
 %% Package results into output structure

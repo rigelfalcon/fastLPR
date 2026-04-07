@@ -294,8 +294,8 @@ fastLPR_py/
 │   ├── example_fig6_applications.py
 │   └── reproduce_all_figures.py
 ├── tests/                    # Test suite
-│   ├── test_integration.py   # Comprehensive integration tests
-│   ├── verify_python.py      # MATLAB cross-validation
+│   ├── test_algorithm.py     # Core algorithm tests
+│   ├── test_nufft.py         # NUFFT accuracy tests
 │   └── ...
 ├── README.md                 # This file
 ├── LICENSE                   # GPL-3.0
