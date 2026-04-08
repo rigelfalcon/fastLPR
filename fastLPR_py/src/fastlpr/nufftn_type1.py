@@ -352,7 +352,17 @@ def _process_spreading_chunk(
     backend = select_accumulation_backend()
 
     if backend == "cython":
-        nufft_accumulate_cython(Ftau_flat, xindx, ysp, strides)
+        # Cython requires exact complex128/int64 dtypes
+        xindx_c = xindx.astype(np.int64, copy=False)
+        ysp_c = ysp.astype(np.complex128, copy=False)
+        strides_c = strides.astype(np.int64, copy=False)
+        if Ftau_flat.dtype == np.complex128:
+            nufft_accumulate_cython(Ftau_flat, xindx_c, ysp_c, strides_c)
+        else:
+            # Low-precision mode: accumulate in complex128 temp, then write back
+            Ftau_tmp = Ftau_flat.astype(np.complex128)
+            nufft_accumulate_cython(Ftau_tmp, xindx_c, ysp_c, strides_c)
+            Ftau_flat[:] = Ftau_tmp.astype(Ftau_flat.dtype)
     elif backend == "numba":
         _accumulate_numba(Ftau_flat, xindx, ysp, dy, strides)
     else:  # python fallback
@@ -736,7 +746,8 @@ def nufftn_type1(
         Kn = Kn * freq_sq_sum  # Final Kn
 
         # Line 163: Kninv=1./Kn
-        # MEMORY OPTIMIZATION: Compute in-place
+        # MEMORY OPTIMIZATION: Compute in-place (guard against zero/underflow)
+        np.maximum(Kn, np.finfo(Kn.dtype).tiny, out=Kn)
         np.reciprocal(Kn, out=Kn)  # Now Kn contains Kninv
 
         # Line 164: Yq = Kninv .* Ftau

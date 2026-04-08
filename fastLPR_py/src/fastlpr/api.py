@@ -42,7 +42,10 @@ def _prepare_bandwidths(
         bandwidths = get_hlist(dh, default_range)
     else:
         h_arr = np.asarray(h, dtype=float)
-        if h_arr.ndim == 1:
+        if h_arr.ndim == 0:
+            # Scalar bandwidth: broadcast to (1, dims)
+            bandwidths = np.full((1, dims), h_arr.item())
+        elif h_arr.ndim == 1:
             if h_arr.size != dims:
                 raise ValueError(
                     "Scalar bandwidth must match the number of dimensions."
@@ -55,7 +58,9 @@ def _prepare_bandwidths(
                 )
             bandwidths = h_arr.reshape(-1, dims)
 
-    # Validate bandwidths: must be positive
+    # Validate bandwidths: must be positive and finite
+    if not np.all(np.isfinite(bandwidths)):
+        raise ValueError("Bandwidth values must be finite (no NaN or Inf).")
     if np.any(bandwidths <= 0):
         raise ValueError(
             "Bandwidth values must be strictly positive. "
@@ -295,7 +300,13 @@ def cv_fastlpr(
             f"x has {x_arr.shape[0]} samples, y has {y_arr.shape[0]} samples."
         )
 
-    # Input validation: check for NaN/Inf
+    # Input validation: check for empty input
+    if x_arr.shape[0] == 0:
+        raise ValueError("Input x must have at least one sample.")
+    if y_arr.shape[0] == 0:
+        raise ValueError("Response y must have at least one sample.")
+
+    # Input validation: check for NaN/Inf in cv_fastlpr
     if np.any(np.isnan(x_arr)):
         raise ValueError("Input x contains NaN values. Please remove or impute NaN values before calling cv_fastlpr.")
     if np.any(np.isinf(x_arr)):
@@ -912,6 +923,10 @@ def cv_fastkde(
         raise ValueError(
             f"Input x must have at least 2 observations. Got {n} observations."
         )
+
+    # Input validation: check for empty input
+    if x_arr.shape[0] == 0:
+        raise ValueError("Input x must have at least one sample.")
 
     # Input validation: check for NaN/Inf
     if np.any(np.isnan(x_arr)):

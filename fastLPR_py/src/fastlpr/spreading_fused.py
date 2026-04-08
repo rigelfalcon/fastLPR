@@ -229,8 +229,8 @@ if HAS_NUMBA:
     def fused_spreading_1d(xmod, y, Ftau_flat, Msp, Mr, hx, tau, strides):
         """1D fused spreading with automatic real/complex dispatch."""
         if np.iscomplexobj(y):
-            Ftau_real = np.zeros_like(Ftau_flat, dtype=np.float64)
-            Ftau_imag = np.zeros_like(Ftau_flat, dtype=np.float64)
+            Ftau_real = np.real(Ftau_flat).astype(np.float64).copy()
+            Ftau_imag = np.imag(Ftau_flat).astype(np.float64).copy()
             fused_spreading_1d_complex(
                 xmod.astype(np.float64),
                 np.real(y).astype(np.float64),
@@ -254,8 +254,8 @@ if HAS_NUMBA:
     def fused_spreading_2d(xmod, y, Ftau_flat, Msp, Mr, hx, tau, strides):
         """2D fused spreading with automatic real/complex dispatch."""
         if np.iscomplexobj(y):
-            Ftau_real = np.zeros_like(Ftau_flat, dtype=np.float64)
-            Ftau_imag = np.zeros_like(Ftau_flat, dtype=np.float64)
+            Ftau_real = np.real(Ftau_flat).astype(np.float64).copy()
+            Ftau_imag = np.imag(Ftau_flat).astype(np.float64).copy()
             fused_spreading_2d_complex(
                 xmod.astype(np.float64),
                 np.real(y).astype(np.float64),
@@ -279,8 +279,8 @@ if HAS_NUMBA:
     def fused_spreading_3d(xmod, y, Ftau_flat, Msp, Mr, hx, tau, strides):
         """3D fused spreading with automatic real/complex dispatch."""
         if np.iscomplexobj(y):
-            Ftau_real = np.zeros_like(Ftau_flat, dtype=np.float64)
-            Ftau_imag = np.zeros_like(Ftau_flat, dtype=np.float64)
+            Ftau_real = np.real(Ftau_flat).astype(np.float64).copy()
+            Ftau_imag = np.imag(Ftau_flat).astype(np.float64).copy()
             fused_spreading_3d_complex(
                 xmod.astype(np.float64),
                 np.real(y).astype(np.float64),
