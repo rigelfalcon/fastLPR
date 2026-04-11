@@ -69,7 +69,7 @@ def _use_cython():
 # Numba-optimized accumulation function for ANY dimension
 if HAS_NUMBA:
 
-    @numba.jit(nopython=True, cache=True, fastmath=True)
+    @numba.jit(nopython=True, cache=True, fastmath=False)
     def _accumulate_numba(Ftau_flat, xindx, ysp, dy, strides):
         """
         Accumulate spreading values into grid using Numba.
@@ -179,7 +179,7 @@ def scale_knots(knots: np.ndarray, N: np.ndarray, Fs: np.ndarray) -> np.ndarray:
 # Numba-optimized heat kernel for better performance
 if HAS_NUMBA:
 
-    @numba.jit(nopython=True, parallel=True, cache=True, fastmath=True)
+    @numba.jit(nopython=True, parallel=True, cache=True, fastmath=False)
     def _heat_kernel_numba(x: np.ndarray, tau_scalar: float) -> np.ndarray:
         """
         Numba-optimized heat kernel computation.
@@ -240,7 +240,8 @@ def heat_kernel(x: np.ndarray, h: np.ndarray) -> np.ndarray:
     # Instead of: result = np.exp(-np.sum((x**2) / (4 * h), axis=2))
     # Use: compute x**2 / (4*h), sum, negate, exp - all with minimal temporaries
     x_sq = np.square(x)  # In-place would need copy first, so use square
-    np.divide(x_sq, 4 * h, out=x_sq)  # In-place divide
+    h_safe = np.maximum(4 * h, np.finfo(x.dtype).tiny)  # Guard against h=0
+    np.divide(x_sq, h_safe, out=x_sq)  # In-place divide
     result = np.sum(x_sq, axis=2)  # Sum along last axis
     np.negative(result, out=result)  # In-place negate
     np.exp(result, out=result)  # In-place exp

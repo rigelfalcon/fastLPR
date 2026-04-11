@@ -97,20 +97,6 @@ end
 % Compute kernel function on grid
 % For order 0: returns kernel values K(x)
 % For order >= 1: returns design matrix elements S_ij(x)
-% DEBUG: Print grid info (disabled)
-% if opt.order > 0 && size(h,1) == 100
-%     fprintf('DEBUG: Grid size N = [%d, %d]\n', N(1), N(2));
-%     fprintf('DEBUG: Padded grid size L = [%d, %d]\n', L(1), L(2));
-%     fprintf('DEBUG: xgrid size = [%d, %d, %d]\n', size(xgrid,1), size(xgrid,2), size(xgrid,3));
-%     fprintf('DEBUG: xgrid range: [%.4f, %.4f] x [%.4f, %.4f]\n', min(xgrid(:,:,1),[],'all'), max(xgrid(:,:,1),[],'all'), min(xgrid(:,:,2),[],'all'), max(xgrid(:,:,2),[],'all'));
-%     fprintf('DEBUG: h size = [%d, %d]\n', size(h,1), size(h,2));
-%     % Check if grid includes origin
-%     x1_grid = xgrid(:,1,1);
-%     x2_grid = xgrid(1,:,2);
-%     [~, idx1] = min(abs(x1_grid));
-%     [~, idx2] = min(abs(x2_grid));
-%     fprintf('DEBUG: Closest to origin: x1[%d]=%.6f, x2[%d]=%.6f\n', idx1, x1_grid(idx1), idx2, x2_grid(idx2));
-% end
 [kd,ihbad]=get_local_polynomial_kernel(xgrid,h,opt.kernel_type,opt.order,dx,lwp);
 
 
@@ -122,15 +108,6 @@ ndcolon(1:dx) = {':'};
 
 if sum(ihbad) && sum(~ihbad)>0
     % Some bandwidths are too small, remove them
-    % DEBUG: Print which bandwidths are bad (disabled)
-    % if size(h,1) == 100
-    %     bad_indices = find(ihbad);
-    %     fprintf('DEBUG: Bad bandwidth indices: %s\n', mat2str(bad_indices));
-    %     for i = 1:min(5, length(bad_indices))
-    %         idx = bad_indices(i);
-    %         fprintf('DEBUG:   [%d]: h = [%.4f, %.4f]\n', idx, h(idx,1), h(idx,2));
-    %     end
-    % end
     warning('fastLPR:kdf:SmallBandwidth', ...
         '%d bandwidth(s) are too small for this grid and will be removed', sum(ihbad));
 

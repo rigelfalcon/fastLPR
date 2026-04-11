@@ -446,6 +446,78 @@ def _lwp_2d_order2_real(s: List[np.ndarray], t: List[np.ndarray]) -> np.ndarray:
     with open(formula_file, "r") as f:
         formula_str = f.read().strip()
 
-    # Evaluate the formula
-    # The formula is in the form: (numerator) / (denominator)
-    return eval(formula_str)
+    # Fix MATLAB syntax: ./ → /
+    formula_str = formula_str.replace("./", "/")
+
+    # The formula is (numerator)/(denominator).
+    # Python's PEG parser cannot handle expressions this large (~32K chars).
+    # Strategy: split into numerator/denominator, then eval each in chunks.
+    import re
+
+    def _chunked_eval(expr, local_vars, chunk_terms=100):
+        """Eval a long additive expression by splitting into chunks."""
+        expr = expr.strip()
+        # Strip outer parens
+        if expr.startswith('(') and expr.endswith(')'):
+            inner = expr[1:-1]
+            d = 0
+            balanced = True
+            for c in inner:
+                if c == '(': d += 1
+                elif c == ')': d -= 1
+                if d < 0: balanced = False; break
+            if balanced and d == 0:
+                expr = inner
+
+        # Split at top-level + and - into terms
+        terms = []
+        current = []
+        depth = 0
+        for c in expr:
+            if c == '(': depth += 1
+            elif c == ')': depth -= 1
+            if depth == 0 and c in ('+', '-') and current:
+                terms.append(''.join(current).strip())
+                current = [c]
+            else:
+                current.append(c)
+        if current:
+            terms.append(''.join(current).strip())
+
+        # Eval in chunks
+        result = None
+        for i in range(0, len(terms), chunk_terms):
+            chunk = ''.join(terms[i:i + chunk_terms])
+            # First chunk may not start with + or -
+            if chunk and chunk[0] not in ('+', '-'):
+                chunk = '+' + chunk
+            val = eval('0' + chunk, {"__builtins__": {}}, local_vars)  # noqa: S307
+            result = val if result is None else result + val
+        return result
+
+    local_vars = {
+        's1': s1, 's2': s2, 's3': s3, 's4': s4, 's5': s5, 's6': s6,
+        's7': s7, 's8': s8, 's9': s9, 's10': s10, 's11': s11, 's12': s12,
+        's13': s13, 's14': s14, 's15': s15, 's16': s16, 's17': s17, 's18': s18,
+        's19': s19, 's20': s20, 's21': s21,
+        't1': t1, 't2': t2, 't3': t3, 't4': t4, 't5': t5, 't6': t6,
+    }
+
+    # Split at top-level /
+    depth = 0
+    split_pos = -1
+    for i, c in enumerate(formula_str):
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+        if depth == 0 and i < len(formula_str) - 1 and formula_str[i + 1] == '/':
+            split_pos = i + 1
+            break
+
+    if split_pos > 0:
+        numerator = _chunked_eval(formula_str[:split_pos], local_vars)
+        denominator = _chunked_eval(formula_str[split_pos + 1:], local_vars)
+        return numerator / denominator
+    else:
+        return _chunked_eval(formula_str, local_vars)

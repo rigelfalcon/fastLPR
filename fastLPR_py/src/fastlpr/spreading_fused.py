@@ -240,7 +240,7 @@ if HAS_NUMBA:
                 hx.astype(np.float64), tau.astype(np.float64),
                 strides.astype(np.int64)
             )
-            Ftau_flat[:] = Ftau_real + 1j * Ftau_imag
+            Ftau_flat[:] = (Ftau_real + 1j * Ftau_imag).astype(Ftau_flat.dtype)
         else:
             fused_spreading_1d_real(
                 xmod.astype(np.float64),
@@ -265,7 +265,7 @@ if HAS_NUMBA:
                 hx.astype(np.float64), tau.astype(np.float64),
                 strides.astype(np.int64)
             )
-            Ftau_flat[:] = Ftau_real + 1j * Ftau_imag
+            Ftau_flat[:] = (Ftau_real + 1j * Ftau_imag).astype(Ftau_flat.dtype)
         else:
             fused_spreading_2d_real(
                 xmod.astype(np.float64),
@@ -290,7 +290,7 @@ if HAS_NUMBA:
                 hx.astype(np.float64), tau.astype(np.float64),
                 strides.astype(np.int64)
             )
-            Ftau_flat[:] = Ftau_real + 1j * Ftau_imag
+            Ftau_flat[:] = (Ftau_real + 1j * Ftau_imag).astype(Ftau_flat.dtype)
         else:
             fused_spreading_3d_real(
                 xmod.astype(np.float64),

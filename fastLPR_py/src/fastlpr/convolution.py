@@ -73,6 +73,8 @@ def nufft_type1_wrapper(
 
     # Compute df from N: df = 1/N
     # MATLAB will compute N = round(1/df) = grid_shape
+    if np.any(N <= 0):
+        raise ValueError(f"Grid shape must be positive, got {N}")
     df = 1.0 / N
 
     # Set Fs = None (will default to N in MATLAB)

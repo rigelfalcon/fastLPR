@@ -17,7 +17,10 @@
 % Author: Ying Wang, Min Li
 % Date: 2025-10-22
 
-addpath(genpath('fastLPR/utility'));
+% Resolve paths relative to this script's location (utility/core/)
+script_dir = fileparts(mfilename('fullpath'));
+utility_dir = fileparts(script_dir);  % utility/
+addpath(genpath(utility_dir));
 
 % Cases to generate
 cases = {
@@ -71,7 +74,8 @@ fprintf('All formulas generated!\n\n');
 % Now write them to estimated_lwp_estimator.m
 fprintf('Writing to estimated_lwp_estimator.m...\n');
 
-fid = fopen('fastLPR/utility/core/estimated_lwp_estimator.m', 'w');
+output_file = fullfile(script_dir, 'estimated_lwp_estimator.m');
+fid = fopen(output_file, 'w');
 
 % Write header
 fprintf(fid, 'function [mfun]=estimated_lwp_estimator(dx,p,iscomplex)\n');
@@ -99,4 +103,4 @@ end
 fprintf(fid, 'end\n');
 fclose(fid);
 
-fprintf('Done! File written to: fastLPR/utility/core/estimated_lwp_estimator.m\n');
+fprintf('Done! File written to: %s\n', output_file);
