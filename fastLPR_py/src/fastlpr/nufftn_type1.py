@@ -616,7 +616,16 @@ def nufftn_type1(
             # Accumulate using centralized backend selection
             backend = select_accumulation_backend()
             if backend == "cython":
-                nufft_accumulate_cython(Ftau_flat, xindx, ysp, strides)
+                # Cython requires exact complex128/int64 dtypes
+                xindx_c = xindx.astype(np.int64, copy=False)
+                ysp_c = ysp.astype(np.complex128, copy=False)
+                strides_c = strides.astype(np.int64, copy=False)
+                if Ftau_flat.dtype == np.complex128:
+                    nufft_accumulate_cython(Ftau_flat, xindx_c, ysp_c, strides_c)
+                else:
+                    Ftau_tmp = np.zeros_like(Ftau_flat, dtype=np.complex128)
+                    nufft_accumulate_cython(Ftau_tmp, xindx_c, ysp_c, strides_c)
+                    Ftau_flat += Ftau_tmp.astype(Ftau_flat.dtype)
             elif backend == "numba":
                 _accumulate_numba(Ftau_flat, xindx, ysp, dy, strides)
             else:  # python fallback
