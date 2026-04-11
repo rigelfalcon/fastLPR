@@ -48,10 +48,10 @@ uv pip install -e .
 uv run python -c "from fastlpr import cv_fastlpr; print('fastLPR installed successfully')"
 ```
 
-### Option 2: Install from PyPI (when published)
+### Option 2: Install from PyPI
 
 ```bash
-pip install fastlpr==1.0.0
+pip install fastlpr
 ```
 
 ---
@@ -273,12 +273,13 @@ For detailed documentation, see:
 If you use fastLPR in your research, please cite:
 
 ```bibtex
-@article{fastlpr2024,
-  title={fastLPR: Fast Local Polynomial Regression via NUFFT},
-  author={Wang, Ying and Li, Min},
-  journal={Journal of Statistical Software},
-  year={2024},
-  note={Python implementation}
+@article{WangLiPazLinaresValdesSosa2026,
+  title  = {{fastLPR}: Fast Local Polynomial Regression via {NUFFT}
+            in {MATLAB}, {Python}, and {R}},
+  author = {Wang, Ying and Li, Min and Paz-Linares, Deirel
+            and Valdes-Sosa, Pedro A.},
+  journal = {Submitted to Journal of Statistical Software},
+  year    = {2026}
 }
 ```
 
@@ -298,10 +299,10 @@ If you use fastLPR in your research, please cite:
 
 GNU General Public License v3.0 or later (GPL-3.0+)
 
-Copyright (c) 2024 Ying Wang, Min Li
+Copyright (c) 2019-2026 Ying Wang, Min Li, Deirel Paz-Linares, Pedro A. Valdes-Sosa
 
 ---
 
 **Document Version:** 1.0.0
-**Last Updated:** 2025-11-20
+**Last Updated:** 2026-04-11
 **Replication Archive:** JSS Submission

@@ -17,7 +17,7 @@
 #   - Summary report printed to console
 #   - Log file saved to replication/reproduction_log.txt
 #
-# Copyright (c) 2024 Ying Wang, Min Li
+# Copyright (c) 2019-2026 Ying Wang, Min Li
 # License: GPL-3.0-or-later
 ################################################################################
 
@@ -69,8 +69,7 @@ if [ ! -d ".venv" ]; then
     uv venv
 fi
 
-echo "Installing dependencies (uv pip)..."
-uv pip install -r "$SCRIPT_DIR/requirements.txt"
+echo "Installing fastlpr package and dependencies..."
 uv pip install -e .
 
 if ! uv run python -c "import fastlpr" &> /dev/null; then
