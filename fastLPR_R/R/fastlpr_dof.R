@@ -88,7 +88,7 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
     #   - Even RNGkind("Mersenne-Twister") doesn't help (different seed init)
     # For cross-language reproducibility, use opt$dof_random_vectors from MATLAB.
     # For R-only use, statistical equivalence is sufficient (same N(0,1) distribution).
-    set.seed(42)  # Fixed seed for R-internal reproducibility
+    if (!is.null(regs$opt$seed)) set.seed(regs$opt$seed)
     p <- matrix(rnorm(Tx * num_samples), nrow = Tx, ncol = num_samples)
   }
 

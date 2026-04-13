@@ -100,7 +100,7 @@ fastlpr_kdf <- function(x, h, N, opt) {
       # Order >= 1: kd is list
       for (i in seq_along(kd)) {
         if (is.logical(kd[[i]])) {
-          cat(sprintf("WARNING: kd[[%d]] is logical, converting to numeric\n", i))
+          warning(sprintf("kd[[%d]] is logical, converting to numeric", i))
           kd[[i]] <- as.numeric(kd[[i]])
         }
         dims <- dim(kd[[i]])

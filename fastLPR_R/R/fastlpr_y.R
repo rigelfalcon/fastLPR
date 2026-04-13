@@ -291,7 +291,7 @@ row_sd <- function(x) {
         # Generate random probe vectors for DOF estimation
         # NOTE: R's rnorm will NOT match MATLAB's randn (different algorithms)
         # For cross-language tests, use opt$dof_random_vectors from MATLAB
-        set.seed(42)  # Fixed seed for R-internal reproducibility
+        if (!is.null(regs$opt$seed)) set.seed(regs$opt$seed)
         p <- matrix(rnorm(Tx * num_dof_sample), nrow = Tx, ncol = num_dof_sample)
       }
 
@@ -535,10 +535,12 @@ row_sd <- function(x) {
       )
 
       # Display selected bandwidth
-      cat(sprintf("[fastlpr]: [%dd] regression with order %d\n", dx, regs$opt$order))
-      cat(sprintf(" - selected bandwidth - [%dth] h\n", id1se))
-      cat(sprintf(" - normalized scale h = [%s]\n", paste(round(h1se, 4), collapse = ", ")))
-      cat(sprintf(" - original scale h = [%s]\n", paste(round(h1se * regs$x_std, 4), collapse = ", ")))
+      if (isTRUE(regs$opt$verbose)) {
+        message(sprintf("[fastlpr]: [%dd] regression with order %d", dx, regs$opt$order))
+        message(sprintf(" - selected bandwidth - [%dth] h", id1se))
+        message(sprintf(" - normalized scale h = [%s]", paste(round(h1se, 4), collapse = ", ")))
+        message(sprintf(" - original scale h = [%s]", paste(round(h1se * regs$x_std, 4), collapse = ", ")))
+      }
 
     } else {
       # No GCV computed: return FIRST bandwidth's fitted values
