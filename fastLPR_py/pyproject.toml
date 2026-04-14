@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fastlpr"
-version = "1.0.0"
+version = "1.0.1"
 description = "Fast Local Polynomial Regression and Kernel Density Estimation using NUFFT"
 authors = [{ name = "Ying Wang", email = "yingwangrigel@gmail.com" }, { name = "Min Li", email = "minli.231314@gmail.com" }]
 maintainers = [{ name = "Ying Wang", email = "yingwangrigel@gmail.com" }]
@@ -45,14 +45,6 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.4",
-    "pytest-cov>=4.1",
-    "black>=23.7",
-    "ruff>=0.1.6",
-    "mypy>=1.5",
-]
-docs = ["sphinx>=7.0", "furo>=2023.9.10"]
 plot = ["matplotlib>=3.7"]
 accel = [
     "cython>=3.0",
