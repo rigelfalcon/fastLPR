@@ -413,24 +413,24 @@ fastkde_lcv <- function(regs, x) {
 
   # Print 1-SE selection details (when debug mode enabled)
   if (getOption("fastlpr.debug", FALSE)) {
-    cat("\n=== 1-SE RULE DEBUG ===\n")
-    cat(sprintf("Max LCV index: %d\n", idmax))
-    cat(sprintf("Max LCV value: %.6f\n", lcv_scores[idmax]))
-    cat(sprintf("SE at max: %.6f\n", lcv_std[idmax]))
-    cat(sprintf("1-SE threshold: %.6f\n", semax))
-    cat(sprintf("Number of candidates: %d\n", length(valid_indices)))
+    message("\n=== 1-SE RULE DEBUG ===\n")
+    message(sprintf("Max LCV index: %d\n", idmax))
+    message(sprintf("Max LCV value: %.6f\n", lcv_scores[idmax]))
+    message(sprintf("SE at max: %.6f\n", lcv_std[idmax]))
+    message(sprintf("1-SE threshold: %.6f\n", semax))
+    message(sprintf("Number of candidates: %d\n", length(valid_indices)))
     if (length(valid_indices) > 0) {
-      cat("Candidate indices:\n")
+      message("Candidate indices:\n")
       for (idx in valid_indices) {
         if (dx == 1) {
-          cat(sprintf("  idx=%d, h=%.4f, lcv=%.6f\n",
+          message(sprintf("  idx=%d, h=%.4f, lcv=%.6f\n",
                       idx, regs$h[idx, 1], lcv_scores[idx]))
         } else if (dx == 2) {
-          cat(sprintf("  idx=%d, h=[%.4f,%.4f], sum=%.4f, lcv=%.6f\n",
+          message(sprintf("  idx=%d, h=[%.4f,%.4f], sum=%.4f, lcv=%.6f\n",
                       idx, regs$h[idx, 1], regs$h[idx, 2],
                       hsum[idx], lcv_scores[idx]))
         } else {
-          cat(sprintf("  idx=%d, h=[%.4f,%.4f,%.4f], sum=%.4f, lcv=%.6f\n",
+          message(sprintf("  idx=%d, h=[%.4f,%.4f,%.4f], sum=%.4f, lcv=%.6f\n",
                       idx, regs$h[idx, 1], regs$h[idx, 2], regs$h[idx, 3],
                       hsum[idx], lcv_scores[idx]))
         }
@@ -446,17 +446,17 @@ fastkde_lcv <- function(regs, x) {
     id1se <- valid_indices[max_idx]
 
     if (getOption("fastlpr.debug", FALSE)) {
-      cat(sprintf("Selected index: %d (max_idx in candidates: %d)\n", id1se, max_idx))
+      message(sprintf("Selected index: %d (max_idx in candidates: %d)\n", id1se, max_idx))
     }
   } else {
     id1se <- idmax
     if (getOption("fastlpr.debug", FALSE)) {
-      cat(sprintf("No candidates found, using idmax: %d\n", idmax))
+      message(sprintf("No candidates found, using idmax: %d\n", idmax))
     }
   }
 
   if (getOption("fastlpr.debug", FALSE)) {
-    cat("=== END 1-SE DEBUG ===\n\n")
+    message("=== END 1-SE DEBUG ===\n\n")
   }
 
   # Package results

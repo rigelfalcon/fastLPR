@@ -37,6 +37,9 @@ multiple bandwidth candidates are provided.
         'variance' = estimate conditional variance Var[Y|X]}
       \item{N}{Grid resolution for evaluation (default: auto)}
       \item{xrange}{Evaluation range (default: data range)}
+      \item{seed}{Random seed for Monte Carlo DOF estimation (default: NULL, no seed set).
+        Set to an integer for reproducible bandwidth selection.}
+      \item{verbose}{Logical. Print bandwidth selection details (default: FALSE).}
     }}
 }
 \value{
