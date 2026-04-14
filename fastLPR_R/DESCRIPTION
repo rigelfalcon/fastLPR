@@ -5,8 +5,6 @@ Authors@R: c(
     person("Ying", "Wang", email = "yingwangrigel@gmail.com", role = c("aut", "cre")),
     person("Min", "Li", email = "minli.231314@gmail.com", role = "aut")
     )
-Author: Ying Wang [aut, cre], Min Li [aut]
-Maintainer: Ying Wang <yingwangrigel@gmail.com>
 Description: Non-Uniform Fast Fourier Transform ('NUFFT')-accelerated local polynomial
     regression and kernel density estimation for large, scattered, or
     complex-valued datasets. Provides automatic bandwidth selection via

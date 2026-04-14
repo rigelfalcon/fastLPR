@@ -106,16 +106,15 @@ utils::globalVariables(c(
 #' @param pkgname Package name
 #' @noRd
 .onLoad <- function(libname, pkgname) {
-  # Disable JIT compilation to prevent 15+ second overhead
+  # Optionally disable JIT compilation to prevent 15+ second overhead
   # Root cause: R's JIT (level 3) recompiles large closures in get_lwp_estimator()
   # on the second call, causing massive delays. Disabling JIT avoids this.
   # See: https://bugs.r-project.org/show_bug.cgi?id=18555
-  # Performance is actually BETTER without JIT for this package due to the
-  # complex closure structures in lwp_estimator.R
-  old_jit <- compiler::enableJIT(0)
-
-  # Store old JIT level in options for restoration on unload
-  options(fastlpr.old.jit.level = old_jit)
+  # Users can set FASTLPR_DISABLE_JIT=1 to enable this optimization.
+  if (nzchar(Sys.getenv("FASTLPR_DISABLE_JIT", ""))) {
+    old_jit <- compiler::enableJIT(0)
+    options(fastlpr.old.jit.level = old_jit)
+  }
 }
 
 #' Package attach hook
@@ -127,15 +126,15 @@ utils::globalVariables(c(
 #' @param pkgname Package name
 #' @noRd
 .onAttach <- function(libname, pkgname) {
-  # Build startup message including JIT status
+  # Build startup message
   msg <- .fastlpr_startup_message()
-  old_jit <- getOption("fastlpr.old.jit.level", default = 3)
-  jit_msg <- sprintf("fastlpr: JIT disabled (was level %d) to avoid 15s overhead", old_jit)
 
   # Use packageStartupMessage so it can be suppressed with
   # suppressPackageStartupMessages()
   packageStartupMessage(msg)
-  packageStartupMessage(jit_msg)
+  if (!is.null(getOption("fastlpr.old.jit.level"))) {
+    packageStartupMessage("fastlpr: JIT disabled (set FASTLPR_DISABLE_JIT to control)")
+  }
 }
 
 #' Package unload hook
