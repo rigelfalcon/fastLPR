@@ -25,9 +25,14 @@ fastlpr_s <- function(regs) {
     # Order >= 1: Local polynomial regression
     # Compute each element of the design matrix S via convolution
     # S has ns unique elements (lower triangular due to symmetry)
+    #
+    # OPTIMIZATION: Pre-compute NUFFT of Is once, reuse for all ns elements.
+    # For 2D order 1, ns=6, so we save 5 NUFFT calls.
+    Is_ft <- fastlpr_nufft(regs, Is)
     regs$s <- list()
     for (i in regs$lwp$ns:1) {
-      regs$s[[i]] <- fastlpr_conv(regs, regs$kdf[[i]], Is, add_eps = FALSE)
+      regs$s[[i]] <- fastlpr_conv(regs, regs$kdf[[i]], Is_ft,
+                                  flag_transformed = TRUE, add_eps = FALSE)
     }
   }
 

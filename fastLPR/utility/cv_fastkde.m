@@ -90,7 +90,7 @@ function [kde] = cv_fastkde(x, h, opt)
 %   [1] Wand, M. P., & Jones, M. C. (1994). Kernel Smoothing. CRC press.
 %   [2] Wang, Y., & Li, M. (2024). Fast and Exact Kernel-Weighted Regression
 %       for Large-Scale Scattered and Complex-Valued Data.
-%       Journal of Statistical Software (under review).
+%       Submitted.
 %
 % Author: Ying Wang, Min Li
 % Create Time: 2024

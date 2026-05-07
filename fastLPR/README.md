@@ -98,7 +98,7 @@ test_fastlpr_vs_naive_nw  % Validates accuracy vs naive Nadaraya-Watson
 - **Getting Started:** `help fastLPR`
 - **API Reference:** `help function_name` (e.g., `help cv_fastLPR`)
 - **Examples:** See `example/` directory
-- **Paper:** Wang et al. (2025), Journal of Statistical Software
+- **Paper:** Wang et al. (2025), submitted
 
 ## Requirements
 
@@ -113,9 +113,9 @@ If you use fastLPR in your research, please cite:
 @article{wang2025fastlpr,
   title={fastLPR: Fast Local Polynomial Regression via NUFFT in MATLAB, Python, and R},
   author={Wang, Ying and Li, Min and Paz-Linares, Deirel and Valdes-Sosa, Pedro A.},
-  journal={Journal of Statistical Software},
   year={2025},
-  note={In preparation}
+  note={Submitted},
+  url={https://github.com/rigelfalcon/fastLPR}
 }
 ```
 
@@ -133,6 +133,6 @@ GPL-3.0 License. See [LICENSE](LICENSE) for details.
 ## Links
 
 - **GitHub (source):** https://github.com/rigelfalcon/fastLPR
-- **PyPI (Python):** release forthcoming
-- **CRAN (R):** release forthcoming
+- **PyPI (Python):** https://pypi.org/project/fastlpr/
+- **CRAN (R):** https://cran.r-project.org/package=fastlpr
 - **Paper:** Journal of Statistical Software (under review)

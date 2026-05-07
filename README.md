@@ -1,5 +1,6 @@
 # fastLPR: Fast Local Polynomial Regression via NUFFT
 
+[![CRAN status](https://www.r-pkg.org/badges/version/fastlpr)](https://cran.r-project.org/package=fastlpr)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Fast nonparametric regression and kernel density estimation using Non-Uniform Fast Fourier Transform (NUFFT) for MATLAB, Python, and R.
@@ -32,12 +33,12 @@ uv pip install -e .
 ### R
 
 ```r
-# From source
+# From CRAN
+install.packages("fastlpr")
+
+# Or from source
 setwd("fastLPR_R")
 source("setup.R")
-
-# After CRAN acceptance:
-# install.packages("fastlpr")
 ```
 
 ## Quick Start
@@ -100,12 +101,9 @@ If you use fastLPR in your research, please cite:
 @article{wang2025fastlpr,
   title = {{fastLPR}: Fast Local Polynomial Regression via {NUFFT} in {MATLAB}, {Python}, and {R}},
   author = {Wang, Ying and Li, Min and Paz-Linares, Deirel and Valdes-Sosa, Pedro A.},
-  journal = {Journal of Statistical Software},
   year = {2025},
-  volume = {XXX},
-  number = {XX},
-  pages = {1--XX},
-  doi = {10.18637/jss.vXXX.iXX}
+  note = {Submitted},
+  url = {https://github.com/rigelfalcon/fastLPR}
 }
 ```
 

@@ -33,15 +33,15 @@ source("setup.R")
 ### Dependencies
 
 **Required:**
-- R >= 4.0.0
-- Matrix (>= 1.0.0)
+- R >= 4.2.0
 - Rcpp (>= 1.0.0)
-- RcppArmadillo (>= 0.10.0)
+- RcppArmadillo
 
 **Suggested:**
 - testthat (>= 3.0.0) - for testing
 - R.matlab - for cross-validation against MATLAB references
-- akima, interp, fields - for additional interpolation methods
+- akima - for interpolation
+- rgl - for 3D visualization
 
 ## Quick Start
 
@@ -236,9 +236,9 @@ If you use fastlpr in your research, please cite:
 @article{fastlpr2025,
   title = {fastLPR: Fast Local Polynomial Regression with NUFFT Acceleration},
   author = {Wang, Ying and Li, Min},
-  journal = {Journal of Statistical Software},
   year = {2025},
-  note = {R package version 1.0.0}
+  note = {R package version 1.0.1},
+  url = {https://github.com/rigelfalcon/fastLPR}
 }
 ```
 

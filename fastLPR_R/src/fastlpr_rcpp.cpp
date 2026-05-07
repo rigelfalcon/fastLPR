@@ -29,6 +29,13 @@
 #include <omp.h>
 #endif
 
+// Direct FFTW3 for single-precision (float32) FFT path
+// When ARMA_USE_FFTW3 is defined, fftw3.h is available via Armadillo's dependency.
+// We use fftwf_* (single-precision) functions directly for accuracy <= 4.
+#ifdef ARMA_USE_FFTW3
+#include <fftw3.h>
+#endif
+
 using namespace Rcpp;
 using namespace arma;
 
@@ -37,12 +44,11 @@ using namespace arma;
 // N-DIMENSIONAL FFT
 // =============================================================================
 //
-// PERFORMANCE NOTE (2025-12-28):
-// These functions are SLOWER than R's base fft()/mvfft() when called from R.
-// R<->C++ data copy overhead (~8ms @ N=1M) negates any FFTW3 advantage.
-// Use R's base fft() for standalone FFT operations from R code.
-//
-// These are kept for potential internal C++ use and backward compatibility.
+// PERFORMANCE NOTE:
+// Standalone FFT wrappers below are slower than R's base fft()/mvfft() when
+// called from R due to R<->C++ data copy overhead. These are kept for
+// internal C++ use (inside rcpp_nufft_type1, rcpp_conv_nd_full) where
+// there is no R<->C++ crossing.
 // =============================================================================
 
 // Apply 1D FFT along a specific axis of an N-dimensional array
@@ -616,20 +622,13 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
 // PARALLEL FFT OPERATIONS
 // =============================================================================
 //
-// PERFORMANCE NOTE (2025-12-28):
-// These standalone FFT functions are SLOWER than R's base fft() when called
-// from R due to R<->C++ data copy overhead (~8ms per call @ N=1M).
-//
-// Benchmark results (N=1M complex, 32 threads):
-//   - R base fft():        30 ms  (no copy overhead)
-//   - Rcpp/Armadillo+FFTW3: 38 ms  (copy overhead negates FFTW3 gain)
-//   - Python pyfftw:       28 ms  (reference)
-//
-// These functions ARE still useful for INTERNAL C++ use (e.g., inside
-// rcpp_nufft_type1, rcpp_conv_nd_full) where there's no R<->C++ crossing.
+// PERFORMANCE NOTE:
+// Standalone FFT wrappers are slower than R's base fft() when called from R
+// due to R<->C++ data copy overhead. They ARE useful for internal C++ use
+// (inside rcpp_nufft_type1, rcpp_conv_nd_full) where there's no R<->C++ crossing.
 //
 // DO NOT call rcpp_fft2d_batch/rcpp_fft3d_batch from R's design_matrix.R.
-// Use base R fft() instead - it's faster for standalone FFT operations.
+// Use base R fft() instead for standalone FFT operations.
 // =============================================================================
 
 // Parallel 3D FFT - process all bandwidths in parallel
@@ -901,6 +900,108 @@ NumericVector rcpp_extract_subarray(NumericVector arr, IntegerVector dims,
 
 
 // =============================================================================
+// SINGLE-PRECISION FFT HELPERS (via FFTW3 fftwf_*)
+// =============================================================================
+//
+// When accuracy <= 4, we can use float32/complex64 for FFT operations.
+// This halves memory bandwidth and can provide ~1.5-2x speedup on FFT-heavy
+// workloads. The approach:
+//   1. Downcast complex<double> workspace to complex<float>
+//   2. Run FFT/IFFT via fftwf_plan_dft_1d (single-precision FFTW3)
+//   3. Upcast result back to complex<double>
+//
+// Only available when FFTW3 is linked (ARMA_USE_FFTW3 defined).
+// Falls back to double-precision Armadillo FFT otherwise.
+
+#ifdef ARMA_USE_FFTW3
+
+// Thread-safety: FFTW3 plan creation/destruction is NOT thread-safe.
+// We protect with a mutex when OpenMP is enabled.
+#ifdef _OPENMP
+#include <mutex>
+static std::mutex fftw_plan_mutex;
+#define FFTW_PLAN_LOCK() std::lock_guard<std::mutex> _fftw_lock(fftw_plan_mutex)
+#else
+#define FFTW_PLAN_LOCK() ((void)0)
+#endif
+
+// In-place 1D IFFT on a contiguous array of complex<float>, length n.
+// Uses FFTW3 single-precision. Normalizes by 1/n (to match arma::ifft).
+// NOTE: Use ::fftwf_plan_s* to disambiguate from arma::fftwf_plan (void* typedef).
+static void fftwf_ifft_1d_inplace(std::complex<float>* data, int n) __attribute__((unused));
+static void fftwf_ifft_1d_inplace(std::complex<float>* data, int n) {
+    ::fftwf_plan_s* plan;
+    {
+        FFTW_PLAN_LOCK();
+        plan = ::fftwf_plan_dft_1d(
+            n,
+            reinterpret_cast< ::fftwf_complex*>(data),
+            reinterpret_cast< ::fftwf_complex*>(data),
+            FFTW_BACKWARD,
+            FFTW_ESTIMATE
+        );
+    }
+    ::fftwf_execute(plan);
+    {
+        FFTW_PLAN_LOCK();
+        ::fftwf_destroy_plan(plan);
+    }
+    float inv_n = 1.0f / static_cast<float>(n);
+    for (int i = 0; i < n; ++i) {
+        data[i] *= inv_n;
+    }
+}
+
+// In-place 1D FFT (forward) on a contiguous array of complex<float>, length n.
+static void fftwf_fft_1d_inplace(std::complex<float>* data, int n) {
+    ::fftwf_plan_s* plan;
+    {
+        FFTW_PLAN_LOCK();
+        plan = ::fftwf_plan_dft_1d(
+            n,
+            reinterpret_cast< ::fftwf_complex*>(data),
+            reinterpret_cast< ::fftwf_complex*>(data),
+            FFTW_FORWARD,
+            FFTW_ESTIMATE
+        );
+    }
+    ::fftwf_execute(plan);
+    {
+        FFTW_PLAN_LOCK();
+        ::fftwf_destroy_plan(plan);
+    }
+}
+
+// Batch 1D IFFT on columns of a contiguous (n x n_cols) column-major matrix.
+static void fftwf_ifft_batch_cols(std::complex<float>* data, int n, int n_cols) __attribute__((unused));
+static void fftwf_ifft_batch_cols(std::complex<float>* data, int n, int n_cols) {
+    int fft_dims[] = {n};
+    ::fftwf_plan_s* plan;
+    {
+        FFTW_PLAN_LOCK();
+        plan = ::fftwf_plan_many_dft(
+            1, fft_dims, n_cols,
+            reinterpret_cast< ::fftwf_complex*>(data), NULL, 1, n,
+            reinterpret_cast< ::fftwf_complex*>(data), NULL, 1, n,
+            FFTW_BACKWARD, FFTW_ESTIMATE
+        );
+    }
+    ::fftwf_execute(plan);
+    {
+        FFTW_PLAN_LOCK();
+        ::fftwf_destroy_plan(plan);
+    }
+    float inv_n = 1.0f / static_cast<float>(n);
+    int total = n * n_cols;
+    for (int i = 0; i < total; ++i) {
+        data[i] *= inv_n;
+    }
+}
+
+#endif // ARMA_USE_FFTW3
+
+
+// =============================================================================
 // DIMENSION-AGNOSTIC CONVOLUTION PIPELINE (LIKE MATLAB)
 // =============================================================================
 
@@ -911,15 +1012,17 @@ NumericVector rcpp_extract_subarray(NumericVector arr, IntegerVector dims,
 //   end
 //
 // kdf: (L1, L2, ..., Ldx, dh) - kernel in Fourier domain
-// y_ft: (L1, L2, ..., Ldx, dy) - data in Fourier domain  
-// L: spatial dimensions [L1, L2, ...] 
+// y_ft: (L1, L2, ..., Ldx, dy) - data in Fourier domain
+// L: spatial dimensions [L1, L2, ...]
 // qout: extraction indices matrix (2 x dx), 1-based R indices
+// use_single: if true AND FFTW3 is available, use float32 FFT (for accuracy<=4)
 // Returns: (N1, N2, ..., Ndx, dh, dy) - convolution result
 //
 // [[Rcpp::export]]
 ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
                                  IntegerVector L_vec, int dh, int dy,
-                                 IntegerMatrix qout, bool y_isreal = true) {
+                                 IntegerMatrix qout, bool y_isreal = true,
+                                 bool use_single = false) {
     int dx = L_vec.size();
     
     // Compute total spatial size
@@ -961,16 +1064,138 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
     // Output array
     size_t out_total = N_total * dh * dy;
     ComplexVector result(out_total);
-    
-    // Process each (bandwidth, response) pair in parallel
+
+#ifdef ARMA_USE_FFTW3
+    // ================================================================
+    // SINGLE-PRECISION PATH: Pre-create FFTW plans, then run in parallel
+    // ================================================================
+    if (use_single) {
+        // Pre-create one plan per axis dimension (outside OMP parallel region).
+        // Use FFTW_ESTIMATE so plan creation doesn't touch the data arrays.
+        // Then use fftwf_execute_dft() inside threads with thread-local data.
+        int max_axis_len = *std::max_element(L.begin(), L.end());
+        std::vector<std::complex<float>> plan_buf(max_axis_len);
+
+        // Plans for strided axes (1D IFFT per axis)
+        std::vector< ::fftwf_plan_s*> ifft_plans(dx, nullptr);
+        for (int axis = 0; axis < dx; ++axis) {
+            int n_axis = L[axis];
+            ifft_plans[axis] = ::fftwf_plan_dft_1d(
+                n_axis,
+                reinterpret_cast< ::fftwf_complex*>(plan_buf.data()),
+                reinterpret_cast< ::fftwf_complex*>(plan_buf.data()),
+                FFTW_BACKWARD,
+                FFTW_ESTIMATE
+            );
+        }
+
+        // Plan for axis 0 batch IFFT (contiguous columns)
+        size_t n_transforms_ax0 = L_total / L[0];
+        int fft_dims[] = {L[0]};
+        ::fftwf_plan_s* batch_plan = ::fftwf_plan_many_dft(
+            1, fft_dims, (int)n_transforms_ax0,
+            reinterpret_cast< ::fftwf_complex*>(plan_buf.data()), NULL, 1, L[0],
+            reinterpret_cast< ::fftwf_complex*>(plan_buf.data()), NULL, 1, L[0],
+            FFTW_BACKWARD, FFTW_ESTIMATE
+        );
+
+        #ifdef _OPENMP
+        #pragma omp parallel for collapse(2) schedule(dynamic)
+        #endif
+        for (int d_idx = 0; d_idx < dy; ++d_idx) {
+            for (int h_idx = 0; h_idx < dh; ++h_idx) {
+                // Thread-local workspace in single precision
+                std::vector<std::complex<float>> m_ft_f(L_total);
+                std::vector<std::complex<float>> slice_f(max_axis_len);
+
+                // Step 1: Broadcast multiply (downcast on the fly)
+                for (size_t s = 0; s < L_total; ++s) {
+                    size_t kdf_idx = s + h_idx * L_total;
+                    size_t y_idx = s + d_idx * L_total;
+                    std::complex<float> k((float)kdf[kdf_idx].r, (float)kdf[kdf_idx].i);
+                    std::complex<float> y_val((float)y_ft[y_idx].r, (float)y_ft[y_idx].i);
+                    m_ft_f[s] = k * y_val;
+                }
+
+                // Step 2: Inverse FFT along each dimension
+                for (int axis = dx - 1; axis >= 0; --axis) {
+                    int n_axis = L[axis];
+                    size_t stride = L_strides[axis];
+                    size_t n_transforms = L_total / n_axis;
+                    float inv_n = 1.0f / static_cast<float>(n_axis);
+
+                    if (axis == 0) {
+                        // Batch IFFT on contiguous columns using pre-created plan
+                        ::fftwf_execute_dft(batch_plan,
+                            reinterpret_cast< ::fftwf_complex*>(m_ft_f.data()),
+                            reinterpret_cast< ::fftwf_complex*>(m_ft_f.data()));
+                        // Normalize
+                        for (size_t i = 0; i < L_total; ++i) {
+                            m_ft_f[i] *= inv_n;
+                        }
+                    } else {
+                        // Strided axis
+                        for (size_t t = 0; t < n_transforms; ++t) {
+                            size_t base = 0;
+                            size_t temp = t;
+                            for (int d = 0; d < dx; ++d) {
+                                if (d != axis) {
+                                    int coord = temp % L[d];
+                                    temp /= L[d];
+                                    base += coord * L_strides[d];
+                                }
+                            }
+                            for (int i = 0; i < n_axis; ++i) {
+                                slice_f[i] = m_ft_f[base + i * stride];
+                            }
+                            ::fftwf_execute_dft(ifft_plans[axis],
+                                reinterpret_cast< ::fftwf_complex*>(slice_f.data()),
+                                reinterpret_cast< ::fftwf_complex*>(slice_f.data()));
+                            for (int i = 0; i < n_axis; ++i) {
+                                m_ft_f[base + i * stride] = slice_f[i] * inv_n;
+                            }
+                        }
+                    }
+                }
+
+                // Step 3: Extract evaluation grid (upcast to double)
+                for (size_t out_s = 0; out_s < N_total; ++out_s) {
+                    size_t temp = out_s;
+                    size_t in_idx = 0;
+                    for (int d = 0; d < dx; ++d) {
+                        int coord = temp % N[d];
+                        temp /= N[d];
+                        in_idx += (q_start[d] + coord) * L_strides[d];
+                    }
+                    size_t out_idx = out_s + h_idx * N_total + d_idx * N_total * dh;
+                    if (y_isreal) {
+                        result[out_idx] = Rcomplex{{(double)m_ft_f[in_idx].real(), 0.0}};
+                    } else {
+                        result[out_idx] = Rcomplex{{(double)m_ft_f[in_idx].real(), (double)m_ft_f[in_idx].imag()}};
+                    }
+                }
+            }
+        }
+
+        // Clean up plans
+        for (int axis = 0; axis < dx; ++axis) {
+            if (ifft_plans[axis]) ::fftwf_destroy_plan(ifft_plans[axis]);
+        }
+        if (batch_plan) ::fftwf_destroy_plan(batch_plan);
+
+    } else
+#endif // ARMA_USE_FFTW3
+    {
+    // ================================================================
+    // DOUBLE-PRECISION PATH (default, complex128 via Armadillo/FFTW3)
+    // ================================================================
     #ifdef _OPENMP
     #pragma omp parallel for collapse(2) schedule(dynamic)
     #endif
     for (int d_idx = 0; d_idx < dy; ++d_idx) {
         for (int h_idx = 0; h_idx < dh; ++h_idx) {
-            // Allocate workspace for this thread
             std::vector<std::complex<double>> m_ft(L_total);
-            
+
             // Step 1: Broadcast multiply
             // m_ft[spatial] = kdf[spatial, h] * y_ft[spatial, d]
             for (size_t s = 0; s < L_total; ++s) {
@@ -980,25 +1205,25 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
                 std::complex<double> y(y_ft[y_idx].r, y_ft[y_idx].i);
                 m_ft[s] = k * y;
             }
-            
+
             // Step 2: Inverse FFT along each dimension (like MATLAB)
             // for ix = dx:-1:1; m = ifft(m, [], ix); end
             // OPTIMIZATION: Pre-allocate slice and result once per thread
             int max_axis_len = *std::max_element(L.begin(), L.end());
             cx_vec slice(max_axis_len);
             cx_vec ifft_result(max_axis_len);
-            
+
             for (int axis = dx - 1; axis >= 0; --axis) {
                 int n_axis = L[axis];
                 size_t stride = L_strides[axis];
                 size_t n_transforms = L_total / n_axis;
-                
+
                 // Resize only if needed (avoids allocation)
                 if ((int)slice.n_elem != n_axis) {
                     slice.set_size(n_axis);
                     ifft_result.set_size(n_axis);
                 }
-                
+
                 // OPTIMIZATION: For axis 0 (stride=1), data is contiguous
                 // Can use Armadillo's matrix FFT for better performance
                 if (axis == 0) {
@@ -1022,15 +1247,15 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
                                 base += coord * L_strides[d];
                             }
                         }
-                        
+
                         // Extract slice along axis (strided access)
                         for (int i = 0; i < n_axis; ++i) {
                             slice(i) = m_ft[base + i * stride];
                         }
-                        
+
                         // IFFT (reuse ifft_result vector)
                         ifft_result = arma::ifft(slice);
-                        
+
                         // Store back (strided)
                         for (int i = 0; i < n_axis; ++i) {
                             m_ft[base + i * stride] = ifft_result(i);
@@ -1067,7 +1292,8 @@ ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft,
             }
         }
     }
-    
+    } // end double-precision else block
+
     // Set output dimensions: (N1, N2, ..., Ndx, dh, dy)
     IntegerVector out_dims(dx + 2);
     for (int d = 0; d < dx; ++d) out_dims[d] = N[d];
@@ -1310,46 +1536,78 @@ ComplexVector rcpp_nufft_type1(NumericMatrix knot, NumericMatrix y,
             }
         }
     }
-    
+
     // Apply FFT to oversampled grid with fftshift
     // This matches pure R nufftn_type1: fftshift_array(apply_fft_axis(Ftau, axis, FALSE), axis)
     // For each response variable, apply dx-dimensional FFT
-    for (int d_y = 0; d_y < dy; ++d_y) {
-        // Apply FFT along each dimension, then fftshift
-        for (int d = dx - 1; d >= 0; --d) {  // Process in reverse order like R: for (ix in dx:1)
-            int n_axis = Mr[d];
-            size_t stride = Mr_strides[d];
-            size_t n_transforms = Mr_total / n_axis;
-            int shift = (n_axis + 1) / 2;  // fftshift amount: ceiling(n/2) - FIXED from floor(n/2)
 
-            cx_vec slice(n_axis);
-
-            for (size_t t = 0; t < n_transforms; ++t) {
-                // Compute base index
-                size_t base = d_y * Mr_total;
-                size_t temp = t;
-                for (int dd = 0; dd < dx; ++dd) {
-                    if (dd != d) {
-                        int coord = temp % Mr[dd];
-                        temp /= Mr[dd];
-                        base += coord * Mr_strides[dd];
+#ifdef ARMA_USE_FFTW3
+    // Single-precision FFT path for accuracy <= 4
+    if (accuracy <= 4) {
+        std::vector<std::complex<float>> Ftau_f(Mr_total * dy);
+        for (size_t i = 0; i < Mr_total * (size_t)dy; ++i) {
+            Ftau_f[i] = std::complex<float>((float)Ftau[i].real(), (float)Ftau[i].imag());
+        }
+        std::vector<std::complex<float>> slice_f;
+        for (int d_y = 0; d_y < dy; ++d_y) {
+            for (int d = dx - 1; d >= 0; --d) {
+                int n_axis = Mr[d];
+                size_t stride = Mr_strides[d];
+                size_t n_transforms = Mr_total / n_axis;
+                int shift = (n_axis + 1) / 2;
+                slice_f.resize(n_axis);
+                for (size_t t = 0; t < n_transforms; ++t) {
+                    size_t base = d_y * Mr_total;
+                    size_t temp = t;
+                    for (int dd = 0; dd < dx; ++dd) {
+                        if (dd != d) {
+                            int coord = temp % Mr[dd];
+                            temp /= Mr[dd];
+                            base += coord * Mr_strides[dd];
+                        }
+                    }
+                    for (int i = 0; i < n_axis; ++i) {
+                        slice_f[i] = Ftau_f[base + i * stride];
+                    }
+                    fftwf_fft_1d_inplace(slice_f.data(), n_axis);
+                    for (int i = 0; i < n_axis; ++i) {
+                        int src_idx = (i + shift) % n_axis;
+                        Ftau_f[base + i * stride] = slice_f[src_idx];
                     }
                 }
-
-                // Extract slice
-                for (int i = 0; i < n_axis; ++i) {
-                    slice(i) = Ftau[base + i * stride];
-                }
-
-                // FFT (forward)
-                cx_vec fft_result = arma::fft(slice);
-
-                // Apply fftshift: [shift+1:n, 1:shift] for 1-indexed
-                // In 0-indexed: [shift:n-1, 0:shift-1]
-                // Store back with fftshift applied
-                for (int i = 0; i < n_axis; ++i) {
-                    int src_idx = (i + shift) % n_axis;  // fftshift mapping
-                    Ftau[base + i * stride] = fft_result(src_idx);
+            }
+        }
+        for (size_t i = 0; i < Mr_total * (size_t)dy; ++i) {
+            Ftau[i] = std::complex<double>((double)Ftau_f[i].real(), (double)Ftau_f[i].imag());
+        }
+    } else
+#endif
+    {
+        for (int d_y = 0; d_y < dy; ++d_y) {
+            for (int d = dx - 1; d >= 0; --d) {
+                int n_axis = Mr[d];
+                size_t stride = Mr_strides[d];
+                size_t n_transforms = Mr_total / n_axis;
+                int shift = (n_axis + 1) / 2;
+                cx_vec slice(n_axis);
+                for (size_t t = 0; t < n_transforms; ++t) {
+                    size_t base = d_y * Mr_total;
+                    size_t temp = t;
+                    for (int dd = 0; dd < dx; ++dd) {
+                        if (dd != d) {
+                            int coord = temp % Mr[dd];
+                            temp /= Mr[dd];
+                            base += coord * Mr_strides[dd];
+                        }
+                    }
+                    for (int i = 0; i < n_axis; ++i) {
+                        slice(i) = Ftau[base + i * stride];
+                    }
+                    cx_vec fft_result = arma::fft(slice);
+                    for (int i = 0; i < n_axis; ++i) {
+                        int src_idx = (i + shift) % n_axis;
+                        Ftau[base + i * stride] = fft_result(src_idx);
+                    }
                 }
             }
         }

@@ -212,8 +212,7 @@ The Python implementation achieves **O(N + M log M)** complexity using custom NU
 
 **Performance Notes:**
 - 1D tests are often faster than MATLAB
-- 2D/3D tests are 3-8x slower due to Python overhead
-- All tests complete within the 8x speed threshold
+- 2D/3D tests are within 1.5x of MATLAB speed after dtype and shared-S optimizations
 - Use `flag_power2=False` for 3D to reduce memory usage
 
 ## API Reference
@@ -381,9 +380,9 @@ If you use fastLPR in your research, please cite:
 @article{wang2025fastlpr,
   title={fastLPR: Fast Local Polynomial Regression via NUFFT in MATLAB, Python, and R},
   author={Wang, Ying and Li, Min and Paz-Linares, Deirel and Valdes-Sosa, Pedro A.},
-  journal={Journal of Statistical Software},
   year={2025},
-  note={In preparation}
+  note={Submitted},
+  url={https://github.com/rigelfalcon/fastLPR}
 }
 ```
 
@@ -401,9 +400,9 @@ GPL-3.0 License. See [LICENSE](LICENSE) for details.
 ## Links
 
 - **GitHub (source):** https://github.com/rigelfalcon/fastLPR
-- **PyPI:** release forthcoming
-- **CRAN (R):** release forthcoming
-- **Paper:** Journal of Statistical Software (under review)
+- **PyPI:** https://pypi.org/project/fastlpr/
+- **CRAN (R):** https://cran.r-project.org/package=fastlpr
+- **Paper:** Submitted
 
 ## Troubleshooting
 

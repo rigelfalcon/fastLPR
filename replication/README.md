@@ -1,6 +1,6 @@
 # Replication Materials for fastLPR JSS Submission
 
-This directory contains materials to replicate all results and figures from the fastLPR Journal of Statistical Software (JSS) submission.
+This directory contains materials to replicate all results and figures from the fastLPR manuscript.
 
 ---
 
@@ -278,7 +278,7 @@ If you use fastLPR in your research, please cite:
             in {MATLAB}, {Python}, and {R}},
   author = {Wang, Ying and Li, Min and Paz-Linares, Deirel
             and Valdes-Sosa, Pedro A.},
-  journal = {Submitted to Journal of Statistical Software},
+  journal = {Submitted},
   year    = {2026}
 }
 ```

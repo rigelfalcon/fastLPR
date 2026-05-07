@@ -572,14 +572,19 @@ def cv_fastlpr(
         )
 
     # Get DOF interpolation method from options
-    # MATLAB uses 'spline' (cubic) by default in fastLPR_gridinterp.m
-    # For 1D: Use linear (faster, Numba-accelerated)
-    # For 2D+: Use cubic (matches MATLAB's spline, required for DOF accuracy)
-    # User can override with dof_interp_method option
+    # MATLAB uses 'spline' (cubic) by default in fastLPR_gridinterp.m.
+    # For 1D: linear is fast (Numba-accelerated) and matches MATLAB closely.
+    # For 2D+: cubic is needed for small data (N<5000) to match MATLAB's
+    # spline; linear introduces enough DoF bias to shift 1-SE bandwidth
+    # selection. For large data (N>=5000), the grid is fine enough that
+    # linear matches cubic bandwidth selection while avoiding the expensive
+    # B-spline construction (~10s for typical grids).
     if dims == 1:
-        default_dof_interp = "linear"  # Numba-optimized path for 1D
+        default_dof_interp = "linear"
+    elif n_samples >= 5000:
+        default_dof_interp = "linear"  # fine grid, cubic not needed
     else:
-        default_dof_interp = "cubic"  # Match MATLAB spline for 2D+
+        default_dof_interp = "cubic"
     dof_interp_method = opts.get("dof_interp_method", default_dof_interp)
 
     # Check if y is complex-valued
@@ -603,7 +608,7 @@ def cv_fastlpr(
             random_matrix=random_matrix,
             S_precomputed=S,  # Reuse design matrix for all samples
             params_precomputed=S_params,
-            interp_method=dof_interp_method,  # 'linear' for speed (default), 'cubic' for exact MATLAB match
+            interp_method=dof_interp_method,  # 1D: linear (fast), 2D+: cubic (cross-language alignment)
             y_is_complex=y_is_complex,  # Complex data needs 2x DOF adjustment
         )
 
@@ -614,6 +619,11 @@ def cv_fastlpr(
         # Compute regression for all bandwidths at once
         # m shape: (N1, N2, ..., Nd, dh) for single response
         #          (N1, N2, ..., Nd, dh, dy) for multiple responses
+        # OPTIMIZATION: Share S computed above for the DoF path. S depends only
+        # on (x, h, kernel, order), not on y, so it is bit-identical to what
+        # nufft_regression_with_precomputed_kdf would compute internally.
+        # This avoids recomputing nufft_convolve(ones); savings scale with
+        # grid size and number of polynomial terms.
         m_all, params = nufft_regression_with_precomputed_kdf(
             model.x_scaled,
             model.y_raw,
@@ -623,15 +633,19 @@ def cv_fastlpr(
             order=order,
             accuracy=opts.get("accuracy"),
             regularization=regularization,
+            s_precomputed=S,
         )
 
     # Get GCV interpolation method from options
     # MATLAB uses 'spline' (cubic) by default in fastLPR_gridinterp.m
     # For 1D: Use linear (faster, negligible accuracy difference)
-    # For 2D+: Use cubic (matches MATLAB's spline, required for GCV accuracy)
+    # For 2D+ with large N: Use linear (fine grid makes cubic unnecessary;
+    # avoids expensive B-spline construction). Small N: cubic for MATLAB parity.
     # User can override with gcv_interp_method option
     if dims == 1:
         default_gcv_interp = "linear"  # Fast path for 1D
+    elif n_samples >= 5000:
+        default_gcv_interp = "linear"  # Fine grid, cubic not needed
     else:
         default_gcv_interp = "cubic"  # Match MATLAB spline for 2D+
     gcv_interp_method = opts.get("gcv_interp_method", default_gcv_interp)

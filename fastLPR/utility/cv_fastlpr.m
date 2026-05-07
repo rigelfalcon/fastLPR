@@ -123,7 +123,7 @@ function [regs] = cv_fastlpr(x, y, h, opt)
 % References:
 %   [1] Wang, Y., & Li, M. (2024). Fast and Exact Kernel-Weighted Regression
 %       for Large-Scale Scattered and Complex-Valued Data.
-%       Journal of Statistical Software (under review).
+%       Submitted.
 %
 % Author: Ying Wang, Min Li
 % Create Time: 2021

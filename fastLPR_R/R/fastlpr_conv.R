@@ -1,6 +1,9 @@
 # Copyright (c) 2024-2025 Ying Wang, Min Li
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# Helper: coerce to complex only if not already complex (avoids 1.4s copy overhead)
+.ensure_complex <- function(x) if (is.complex(x)) x else as.complex(x)
+
 #' Fast convolution using NUFFT for scattered data
 #'
 #' Computes convolution of kernel with data using NUFFT (Non-Uniform FFT).
@@ -168,9 +171,10 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
         }
 
         result <- rcpp_conv_nd_fn(
-          as.complex(kdf), as.complex(y_ft_raw),
+          .ensure_complex(kdf), .ensure_complex(y_ft_raw),
           as.integer(regs$L), as.integer(dh), as.integer(dy),
-          qout_mat, regs$y_isreal
+          qout_mat, regs$y_isreal,
+          isTRUE(regs$opt$accuracy <= 4)
         )
         use_rcpp_full <- TRUE
         
@@ -215,15 +219,15 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
 
     if (regs$dx == 1 && rcpp_broadcast_1d) {
       m_ft <- tryCatch({
-        rcpp_broadcast_1d_fn(as.complex(kdf), as.complex(y_ft_raw), L, dh, dy)
+        rcpp_broadcast_1d_fn(.ensure_complex(kdf), .ensure_complex(y_ft_raw), L, dh, dy)
       }, error = function(e) NULL)
     } else if (regs$dx >= 2 && rcpp_broadcast_nd) {
       m_ft <- tryCatch({
         L_spatial <- prod(kdf_dims[1:regs$dx])
-        kdf_flat <- matrix(as.complex(kdf), nrow = L_spatial, ncol = dh)
-        y_ft_flat <- matrix(as.complex(y_ft_raw), nrow = L_spatial, ncol = dy)
+        kdf_flat <- matrix(.ensure_complex(kdf), nrow = L_spatial, ncol = dh)
+        y_ft_flat <- matrix(.ensure_complex(y_ft_raw), nrow = L_spatial, ncol = dy)
         result <- rcpp_broadcast_nd_fn(
-          as.complex(kdf_flat), as.complex(y_ft_flat),
+          .ensure_complex(kdf_flat), .ensure_complex(y_ft_flat),
           as.integer(kdf_dims[1:regs$dx]), as.integer(dh), as.integer(dy)
         )
         array(result, dim = target_dims)
@@ -256,22 +260,61 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
   } else {
     # y is already in Fourier domain
     if (!regs$opt$y_corr_bandwidth) {
-      # Handle 2D y (L, dy) properly for ALL dimensions
-      # When flag_transformed=TRUE (Ny == L), y has shape (L, dy) not (L, dh, dy)
-      # This happens when regs$Tx == regs$L (sample size equals padded grid size)
+      # Determine y shape and local dimensions
       y_dims <- dim(y)
       n_y_dims <- length(y_dims)
+      kdf_dims <- dim(kdf)
 
+      # Compute dh and dy for this path
       if (regs$dx == 1) {
-        # 1D case
-        if (n_y_dims == 2) {
-          # y is (L, dy), kdf is (L, dh)
-          L <- y_dims[1]
-          dy_local <- y_dims[2]
-          kdf_dims <- dim(kdf)
-          dh_local <- if (is.null(kdf_dims) || length(kdf_dims) < 2) 1 else kdf_dims[2]
+        dy_local <- if (n_y_dims >= 2) y_dims[n_y_dims] else 1
+        dh_local <- if (is.null(kdf_dims) || length(kdf_dims) < 2) 1 else kdf_dims[2]
+      } else {
+        dy_local <- if (n_y_dims == regs$dx + 1) y_dims[regs$dx + 1] else if (n_y_dims == regs$dx + 2) y_dims[regs$dx + 2] else 1
+        dh_local <- if (length(kdf_dims) == regs$dx) 1 else kdf_dims[regs$dx + 1]
+      }
 
-          # Broadcast: kdf (L, dh) * y (L, dy) -> (L, dh, dy)
+      # OPTIMIZATION: For pre-computed NUFFT y_ft with shape (L1,...,Ldx, dy),
+      # use rcpp_conv_nd_full which does broadcast multiply + IFFT + extract
+      # all in C++ with OpenMP parallelism. This avoids the slower R broadcast
+      # multiply + R IFFT path.
+      use_rcpp_xformed <- FALSE
+      if (regs$dx >= 1 && n_y_dims == regs$dx + 1 &&
+          all(y_dims[1:regs$dx] == regs$L[1:regs$dx])) {
+        rcpp_conv_nd_fn <- tryCatch({
+          fn <- get0("rcpp_conv_nd_full", envir = globalenv(), inherits = FALSE)
+          if (is.null(fn)) fn <- get0("rcpp_conv_nd_full", envir = asNamespace("fastlpr"), inherits = FALSE)
+          fn
+        }, error = function(e) NULL)
+
+        if (is.function(rcpp_conv_nd_fn)) {
+          m <- tryCatch({
+            if (regs$dx == 1 && is.null(dim(regs$qout))) {
+              qout_mat <- matrix(as.integer(regs$qout), nrow = 2, ncol = 1)
+            } else {
+              qout_mat <- matrix(as.integer(regs$qout), nrow = 2, ncol = regs$dx)
+            }
+            result <- rcpp_conv_nd_fn(
+              .ensure_complex(kdf), .ensure_complex(y),
+              as.integer(regs$L), as.integer(dh_local), as.integer(dy_local),
+              qout_mat, regs$y_isreal,
+              isTRUE(regs$opt$accuracy <= 4)
+            )
+            if (regs$y_isreal) result <- Re(result)
+            array(result, dim = c(regs$N, dh_local, dy_local))
+          }, error = function(e) NULL)
+
+          if (!is.null(m)) {
+            use_rcpp_xformed <- TRUE
+            return(m)
+          }
+        }
+      }
+
+      # FALLBACK: R broadcast multiply + R IFFT
+      if (regs$dx == 1) {
+        if (n_y_dims == 2) {
+          L <- y_dims[1]
           if (dh_local == 1 && dy_local == 1) {
             m_ft <- kdf * y
           } else {
@@ -280,42 +323,23 @@ fastlpr_conv <- function(regs, kdf = NULL, y = NULL, flag_transformed = NULL, ad
             m_ft <- kdf_3d * y_3d
           }
         } else if (n_y_dims == 3) {
-          # y is already 3D (L, dh, dy) - original code path
           m_ft <- kdf * aperm(y, c(1, 3, 2))
         } else {
-          # y is a vector
           m_ft <- kdf * y
         }
       } else {
-        # Multi-D case (dx >= 2)
-        # Expected y shape: (L1, L2, ..., Ldx, dh, dy) = (dx + 2) dimensions
-        # But when flag_transformed=TRUE due to Ny==L, y is (L1, L2, ..., Ldx, dy) = (dx + 1) dimensions
-        expected_dims <- regs$dx + 2  # spatial + dh + dy
-
+        expected_dims <- regs$dx + 2
         if (n_y_dims == regs$dx + 1) {
-          # y is (L1, ..., Ldx, dy) - missing dh dimension
-          # kdf is (L1, ..., Ldx, dh)
-          # Need to broadcast: kdf * y -> (L1, ..., Ldx, dh, dy)
           L_spatial <- prod(y_dims[1:regs$dx])
-          dy_local <- y_dims[regs$dx + 1]
-          kdf_dims <- dim(kdf)
-          dh_local <- if (length(kdf_dims) == regs$dx) 1 else kdf_dims[regs$dx + 1]
-
           if (dh_local == 1 && dy_local == 1) {
-            # Simple case: just element-wise multiply
             m_ft <- kdf * y
           } else {
-            # Reshape to broadcast
-            # kdf: (L_spatial, dh) -> (L_spatial, dh, 1)
-            # y:   (L_spatial, dy) -> (L_spatial, 1, dy)
             kdf_flat <- array(kdf, dim = c(L_spatial, dh_local, 1))
             y_flat <- array(y, dim = c(L_spatial, 1, dy_local))
-            m_ft <- kdf_flat * y_flat  # (L_spatial, dh, dy)
-            # Reshape back to spatial dimensions (may avoid a copy when unshared)
+            m_ft <- kdf_flat * y_flat
             dim(m_ft) <- c(y_dims[1:regs$dx], dh_local, dy_local)
           }
         } else if (n_y_dims == expected_dims) {
-          # y is already (L1, ..., Ldx, dh, dy) - original code path
           perm <- c(1:regs$dx, regs$dx + 2, regs$dx + 1)
           m_ft <- kdf * aperm(y, perm)
         } else {

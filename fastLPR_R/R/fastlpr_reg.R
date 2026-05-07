@@ -24,6 +24,7 @@ fastlpr_reg <- function(regs, y_ft) {
     # mq = sum(K * y) / sum(K)
 
     # Compute T = conv(K, y) using NUFFT convolution (matches MATLAB)
+    # Single kdf: NUFFT computed once inside fastlpr_conv
     t <- fastlpr_conv(regs, regs$kdf, y_ft, flag_transformed = FALSE)
 
     # Ensure s and t have compatible dimensions
@@ -74,12 +75,20 @@ fastlpr_reg <- function(regs, y_ft) {
     # Order >= 1: Local polynomial regression
     # Solve: S * beta = T, where S is the design matrix
 
+    # OPTIMIZATION: Pre-compute NUFFT of y once, reuse for all polynomial terms.
+    # For order 1 (2D), there are nt=3 polynomial terms (kdf[[1]], kdf[[2]], kdf[[3]]).
+    # Each conv call needs the same y_ft_raw = NUFFT(y), so computing it once
+    # and passing with flag_transformed=TRUE saves (nt-1) NUFFT calls.
+    y_ft_precomputed <- fastlpr_nufft(regs, y_ft)
+
     # Compute convolutions T = sum(K * X^j * y)
     t <- list()
     for (i in regs$lwp$nt:1) {
       # For each polynomial term, compute T_i = conv(K_i, y)
       # kdf[[i]] contains the kernel for the i-th polynomial term
-      t_i <- fastlpr_conv(regs, regs$kdf[[i]], y_ft, flag_transformed = FALSE)
+      # Pass pre-computed NUFFT with flag_transformed=TRUE to skip re-computation
+      t_i <- fastlpr_conv(regs, regs$kdf[[i]], y_ft_precomputed,
+                          flag_transformed = TRUE)
 
       # t_i has shape: (L1, L2, ..., dh, dy) for multi-D
       # mfun expects: (L, dh, dy) where L is spatial grid product

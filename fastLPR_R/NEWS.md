@@ -1,6 +1,23 @@
+# fastlpr 1.0.1
+
+## CRAN Resubmission (2026-04-13)
+
+### Fixed
+
+* CRAN reviewer feedback compliance fixes
+
+### Performance
+
+* Rcpp convolution pipeline: fused broadcast multiply + IFFT + extraction into single C++ call (rcpp_conv_nd_full) with OpenMP parallelism
+* Single-precision FFTW3 path for accuracy <= 4, reducing FFT time by ~40%
+* Eliminated redundant as.complex() copies in Rcpp wrapper guards
+* Eliminated 1.6GB broadcast array copy in DoF mfun computation via as.vector() recycling
+* Pre-computed NUFFT of y and ones vector, reused across polynomial terms
+* Overall: R within 1.5x of MATLAB speed
+
 # fastlpr 1.0.0
 
-## Initial CRAN Release
+## Initial CRAN Release (2026-04-03)
 
 ### Features
 
@@ -26,4 +43,3 @@
 
 * R port of the MATLAB/Python fastLPR toolbox
 * Verified against MATLAB reference implementation (MSE < 1e-8)
-* Performance: within 8x of MATLAB speed for all test cases

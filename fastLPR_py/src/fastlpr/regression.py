@@ -1149,8 +1149,8 @@ def estimate_dof_nufft_vectorized(
         Required if S_precomputed is provided.
     interp_method : str, optional
         Interpolation method: 'linear' or 'cubic' (default: 'cubic')
-        - 'cubic': Matches MATLAB's spline interpolation (accurate but slow)
-        - 'linear': Much faster (65x), may affect bandwidth selection slightly
+        - 'cubic': Matches MATLAB's spline interpolation exactly
+        - 'linear': Faster; sufficient for 1D but may shift 2D+ bandwidth selection
 
     Returns
     -------
@@ -1187,8 +1187,8 @@ def estimate_dof_nufft_vectorized(
         p = rng.standard_normal((n, num_samples))
 
     # OPTIMIZATION: Use cached design matrix if provided
-    # Design matrix S depends only on x and h, NOT on y (random samples)
-    # This saves ~50% of computation time!
+    # Design matrix S depends only on x and h, NOT on y (random samples).
+    # Skipping re-computation saves one full S build per DoF call.
     if S_precomputed is not None and params_precomputed is not None:
         # Use cached design matrix and params
         S = S_precomputed
@@ -1347,6 +1347,7 @@ def nufft_regression_with_precomputed_kdf(
     order: int = 0,
     accuracy: int = None,
     regularization: float = 1e-6,
+    s_precomputed: Union[np.ndarray, list, None] = None,
 ) -> Tuple[np.ndarray, dict]:
     """
     NUFFT regression using precomputed kernel in Fourier domain.
@@ -1382,6 +1383,14 @@ def nufft_regression_with_precomputed_kdf(
         NUFFT accuracy parameter
     regularization : float, default=1e-6
         Regularization parameter
+    s_precomputed : ndarray or list, optional
+        Pre-computed design matrix S (from :func:`compute_design_matrix`).
+        If provided, Step 1 (computing S via NUFFT convolutions with a ones
+        vector) is skipped entirely. Shape/structure must match the internal
+        layout: a single ndarray for ``order == 0``, or a list of ``ns``
+        ndarrays for ``order >= 1``. Used by :func:`~fastlpr.api.cv_fastlpr`
+        to share S between the DoF Hutchinson probes and the actual
+        y-regression, saving ~10-15% of total wall time on 2D problems.
 
     Returns
     -------
@@ -1410,33 +1419,21 @@ def nufft_regression_with_precomputed_kdf(
     # For order >= 1: S is a list of design matrix elements
     from .convolution import nufft_convolve
 
-    ones = np.ones(len(x))
-
-    if order == 0:
-        # Order 0: S = sum of kernel weights
-        s = nufft_convolve(
-            x,
-            ones,
-            kd_ft,
-            grid_shape,
-            L,
-            qin,
-            qout,
-            y_is_transformed=False,
-            accuracy=accuracy,
-            y_is_real=True,
-        )
+    if s_precomputed is not None:
+        # OPTIMIZATION: Reuse S already computed by the DoF path (or by the caller).
+        # S depends only on (x, h, kernel, order); it is identical to what we would
+        # recompute here since both paths call nufft_convolve(x, ones, kd_ft[i], ...).
+        # See compute_design_matrix() for the canonical layout.
+        s = s_precomputed
     else:
-        # Order >= 1: Compute each design matrix element
-        lwp = kdf_params["lwp"]
-        ns = lwp["ns"]
+        ones = np.ones(len(x))
 
-        s = []
-        for i in range(ns):
-            s_ij = nufft_convolve(
+        if order == 0:
+            # Order 0: S = sum of kernel weights
+            s = nufft_convolve(
                 x,
                 ones,
-                kd_ft[i],
+                kd_ft,
                 grid_shape,
                 L,
                 qin,
@@ -1445,7 +1442,26 @@ def nufft_regression_with_precomputed_kdf(
                 accuracy=accuracy,
                 y_is_real=True,
             )
-            s.append(s_ij)
+        else:
+            # Order >= 1: Compute each design matrix element
+            lwp = kdf_params["lwp"]
+            ns = lwp["ns"]
+
+            s = []
+            for i in range(ns):
+                s_ij = nufft_convolve(
+                    x,
+                    ones,
+                    kd_ft[i],
+                    grid_shape,
+                    L,
+                    qin,
+                    qout,
+                    y_is_transformed=False,
+                    accuracy=accuracy,
+                    y_is_real=True,
+                )
+                s.append(s_ij)
 
     # Step 2: Compute weighted response T
     if order == 0:

@@ -893,6 +893,18 @@ def nufft_convolve(
     # For 1D: kdf (L, dh), y_ft (L, dy, dh) -> permute to (L, dh, dy)
     # But our y_ft is (L, dy), so we need different broadcasting
 
+    # PRECISION OPTIMIZATION: When y_ft is lower precision (e.g., complex64
+    # from NUFFT with accuracy <= 4), downcast kdf to match. This avoids
+    # upcasting the broadcast result to complex128, which can be enormous
+    # (e.g., (1024, 1024, 25, 10) = 4.2 GB complex128 vs 2.1 GB complex64).
+    # The IFFT of a smaller array is ~3x faster due to halved memory traffic.
+    # This is safe: kernel FFT values don't require double precision for
+    # the convolution step since the result is extracted on a coarser grid and
+    # further processed (interpolation, real-part extraction) in float64.
+    if np.iscomplexobj(y_ft) and np.iscomplexobj(kdf):
+        if y_ft.dtype.itemsize < kdf.dtype.itemsize:
+            kdf = kdf.astype(y_ft.dtype, copy=False)
+
     # Determine number of bandwidths and responses
     if kdf.ndim == dims:
         dh = 1

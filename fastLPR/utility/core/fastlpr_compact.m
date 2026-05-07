@@ -43,7 +43,11 @@ if regs.opt.compact
     % Compact mode: keep only essential fields
     % These are sufficient for prediction and visualization
     % dof_random_vectors is kept for cross-validation reproducibility in Python/R
-    fields={'fpp_yhat','fpp_s0','s0','yhat','opt','d','gcv_yhat','dof_random_vectors'};
+    % pdof_m, df_m, pdof_inv_m, dof, dof_stderr are kept so calc_dof results
+    % survive compaction (otherwise users would see DoF as missing).
+    fields={'fpp_yhat','fpp_s0','s0','yhat','opt','d','gcv_yhat',...
+            'dof_random_vectors','pdof_m','df_m','pdof_inv_m',...
+            'pdof_sd','df_sd','pdof_inv_sd','dof','dof_stderr'};
     regs=keepfield(regs,fields);
 else
     % Non-compact mode: remove only raw data

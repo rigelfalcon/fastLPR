@@ -405,16 +405,40 @@ complex_sign <- function(x) {
 # Moved from closure to avoid 16+ second JIT delays on DOF computation.
 # ============================================================================
 .mfun_internal <- function(S, T, order, dx, regularization = 0) {
-  # Broadcasting preparation (uses top-level function)
-  broadcast_result <- .prepare_broadcasting(S, T)
-  S <- broadcast_result$s
-  T <- broadcast_result$t
+  # Detect if S needs broadcasting to match T's extra dimensions.
+  # When T has more dimensions (e.g. dy probe vectors in DoF), the old code
+  # copied every S element to match T's shape -- ~1.6 GB for typical DoF calls.
+  # Instead, we keep S at its original shape and use R's column-major vector
+  # recycling: as.vector(2D) * as.vector(3D) recycles the shorter vector along
+  # the trailing dimension, which is equivalent to NumPy-style broadcasting.
+  needs_broadcast <- FALSE
+  t_dims <- dim(T[[1]])
+  s_dims <- dim(S[[1]])
+  t_ndim <- if (is.null(t_dims)) 1L else length(t_dims)
+  s_ndim <- if (is.null(s_dims)) 1L else length(s_dims)
+  if (t_ndim > s_ndim) {
+    needs_broadcast <- TRUE
+    # bmul: multiply 2D S-product by 3D T array via vector recycling
+    bmul <- function(s_prod, t_arr) {
+      array(as.vector(s_prod) * as.vector(t_arr), dim = dim(t_arr))
+    }
+    # bdiv: divide 3D numerator by 2D denominator via vector recycling
+    bdiv <- function(num_arr, den_arr) {
+      array(as.vector(num_arr) / as.vector(den_arr), dim = dim(num_arr))
+    }
+  } else {
+    # Same dimensions: use .prepare_broadcasting for any remaining edge cases
+    broadcast_result <- .prepare_broadcasting(S, T)
+    S <- broadcast_result$s
+    T <- broadcast_result$t
+  }
 
   # ORDER 0: m = T / S (Nadaraya-Watson)
   if (order == 0) {
     S_arr <- S[[1]]
     T_arr <- T[[1]]
     S_threshold <- pmax(S_arr, abs(S_arr) * regularization)
+    if (needs_broadcast) return(bdiv(T_arr, S_threshold))
     return(T_arr / S_threshold)
   }
 
@@ -424,6 +448,7 @@ complex_sign <- function(x) {
     t1 <- T[[1]]; t2 <- T[[2]]
     det_S <- s1 * s3 - s2^2
     det_S <- pmax(abs(det_S), .Machine$double.eps * 1e6) * complex_sign(det_S)
+    if (needs_broadcast) return(bdiv(bmul(s3, t1) - bmul(s2, t2), det_S))
     return((s3 * t1 - s2 * t2) / det_S)
   }
 
@@ -431,9 +456,15 @@ complex_sign <- function(x) {
   if (order == 2 && dx == 1) {
     s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]; s6 <- S[[6]]
     t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]
-    numerator <- (s5^2 * t1 - s2 * s5 * t3 + s2 * s6 * t2 + s3 * s4 * t3 - s3 * s5 * t2 - s4 * s6 * t1)
+    if (needs_broadcast) {
+      numerator <- (bmul(s5^2, t1) - bmul(s2 * s5, t3) + bmul(s2 * s6, t2) +
+                    bmul(s3 * s4, t3) - bmul(s3 * s5, t2) - bmul(s4 * s6, t1))
+    } else {
+      numerator <- (s5^2 * t1 - s2 * s5 * t3 + s2 * s6 * t2 + s3 * s4 * t3 - s3 * s5 * t2 - s4 * s6 * t1)
+    }
     denominator <- (s1 * s5^2 + s3^2 * s4 + s2^2 * s6 - s2 * s3 * s5 * 2.0 - s1 * s4 * s6)
     denominator <- pmax(abs(denominator), .Machine$double.eps * 1e6) * complex_sign(denominator)
+    if (needs_broadcast) return(bdiv(numerator, denominator))
     return(numerator / denominator)
   }
 
@@ -441,9 +472,15 @@ complex_sign <- function(x) {
   if (order == 1 && dx == 2) {
     s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]; s6 <- S[[6]]
     t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]
-    numerator <- (s5^2 * t1 - s2 * s5 * t3 + s2 * s6 * t2 + s3 * s4 * t3 - s3 * s5 * t2 - s4 * s6 * t1)
+    if (needs_broadcast) {
+      numerator <- (bmul(s5^2, t1) - bmul(s2 * s5, t3) + bmul(s2 * s6, t2) +
+                    bmul(s3 * s4, t3) - bmul(s3 * s5, t2) - bmul(s4 * s6, t1))
+    } else {
+      numerator <- (s5^2 * t1 - s2 * s5 * t3 + s2 * s6 * t2 + s3 * s4 * t3 - s3 * s5 * t2 - s4 * s6 * t1)
+    }
     denominator <- (s1 * s5^2 + s3^2 * s4 + s2^2 * s6 - s2 * s3 * s5 * 2.0 - s1 * s4 * s6)
     denominator <- pmax(abs(denominator), .Machine$double.eps * 1e6) * complex_sign(denominator)
+    if (needs_broadcast) return(bdiv(numerator, denominator))
     return(numerator / denominator)
   }
 
@@ -452,18 +489,33 @@ complex_sign <- function(x) {
     s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]
     s6 <- S[[6]]; s7 <- S[[7]]; s8 <- S[[8]]; s9 <- S[[9]]; s10 <- S[[10]]
     t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]; t4 <- T[[4]]
-    numerator <- (-s2 * s9^2 * t2 - s3 * s7^2 * t3 - s4 * s6^2 * t4 + s5 * s9^2 * t1 +
-                  s7^2 * s8 * t1 + s6^2 * s10 * t1 + s3 * s6 * s7 * t4 + s4 * s6 * s7 * t3 +
-                  s2 * s6 * s9 * t4 - s2 * s6 * s10 * t3 - s2 * s7 * s8 * t4 + s2 * s7 * s9 * t3 -
-                  s3 * s5 * s9 * t4 + s3 * s5 * s10 * t3 - s3 * s6 * s10 * t2 + s3 * s7 * s9 * t2 +
-                  s4 * s5 * s8 * t4 - s4 * s5 * s9 * t3 + s4 * s6 * s9 * t2 - s4 * s7 * s8 * t2 +
-                  s2 * s8 * s10 * t2 - s6 * s7 * s9 * t1 * 2.0 - s5 * s8 * s10 * t1)
+    if (needs_broadcast) {
+      numerator <- (-bmul(s2 * s9^2, t2) - bmul(s3 * s7^2, t3) - bmul(s4 * s6^2, t4) +
+                    bmul(s5 * s9^2, t1) + bmul(s7^2 * s8, t1) + bmul(s6^2 * s10, t1) +
+                    bmul(s3 * s6 * s7, t4) + bmul(s4 * s6 * s7, t3) +
+                    bmul(s2 * s6 * s9, t4) - bmul(s2 * s6 * s10, t3) -
+                    bmul(s2 * s7 * s8, t4) + bmul(s2 * s7 * s9, t3) -
+                    bmul(s3 * s5 * s9, t4) + bmul(s3 * s5 * s10, t3) -
+                    bmul(s3 * s6 * s10, t2) + bmul(s3 * s7 * s9, t2) +
+                    bmul(s4 * s5 * s8, t4) - bmul(s4 * s5 * s9, t3) +
+                    bmul(s4 * s6 * s9, t2) - bmul(s4 * s7 * s8, t2) +
+                    bmul(s2 * s8 * s10, t2) - bmul(s6 * s7 * s9, t1) * 2.0 -
+                    bmul(s5 * s8 * s10, t1))
+    } else {
+      numerator <- (-s2 * s9^2 * t2 - s3 * s7^2 * t3 - s4 * s6^2 * t4 + s5 * s9^2 * t1 +
+                    s7^2 * s8 * t1 + s6^2 * s10 * t1 + s3 * s6 * s7 * t4 + s4 * s6 * s7 * t3 +
+                    s2 * s6 * s9 * t4 - s2 * s6 * s10 * t3 - s2 * s7 * s8 * t4 + s2 * s7 * s9 * t3 -
+                    s3 * s5 * s9 * t4 + s3 * s5 * s10 * t3 - s3 * s6 * s10 * t2 + s3 * s7 * s9 * t2 +
+                    s4 * s5 * s8 * t4 - s4 * s5 * s9 * t3 + s4 * s6 * s9 * t2 - s4 * s7 * s8 * t2 +
+                    s2 * s8 * s10 * t2 - s6 * s7 * s9 * t1 * 2.0 - s5 * s8 * s10 * t1)
+    }
     denominator <- (-s3^2 * s7^2 - s4^2 * s6^2 - s2^2 * s9^2 + s1 * s5 * s9^2 + s1 * s7^2 * s8 +
                     s1 * s6^2 * s10 + s4^2 * s5 * s8 + s3^2 * s5 * s10 + s2^2 * s8 * s10 +
                     s3 * s4 * s6 * s7 * 2.0 - s2 * s3 * s6 * s10 * 2.0 + s2 * s3 * s7 * s9 * 2.0 +
                     s2 * s4 * s6 * s9 * 2.0 - s2 * s4 * s7 * s8 * 2.0 - s3 * s4 * s5 * s9 * 2.0 -
                     s1 * s6 * s7 * s9 * 2.0 - s1 * s5 * s8 * s10)
     denominator <- pmax(abs(denominator), .Machine$double.eps * 1e6) * complex_sign(denominator)
+    if (needs_broadcast) return(bdiv(numerator, denominator))
     return(numerator / denominator)
   }
 

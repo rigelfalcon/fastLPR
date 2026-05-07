@@ -12,23 +12,14 @@
 #'   end
 #' MATLAB's ifft works on all columns (bandwidths) simultaneously.
 #'
-#' @section IMPORTANT - DO NOT "OPTIMIZE" WITH RCPP FFT:
-#' Benchmark results (N=1M complex):
+#' @section IMPORTANT - WHEN TO USE RCPP FFT:
+#' For a SINGLE 2D/3D FFT, the R<->C++ data copy overhead negates any FFTW3
+#' advantage. But for BATCHED FFT (multiple slices, e.g. dh = 25 bandwidths),
+#' `rcpp_fft2d_batch` / `rcpp_fft3d_batch` parallelize across slices via
+#' OpenMP and can beat the R loop.
 #'
-#' | Backend            | Time    | Notes                              |
-#' |--------------------|---------|-------------------------------------|
-#' | R base fft()       | 30 ms   | Uses FFTPACK, no copy overhead      |
-#' | Rcpp/Armadillo+FFTW3 | 38 ms | R<->C++ data copy kills performance |
-#' | Python pyfftw      | 28 ms   | Reference (32 threads)              |
-#'
-#' The R<->C++ data copy overhead (~8ms) negates any FFTW3 advantage.
-#' Rcpp FFT functions (rcpp_fft2d_batch, rcpp_fft3d_batch) exist in
-#' fastlpr_rcpp.cpp but are SLOWER than base R for standalone FFT calls.
-#'
-#' They ARE still useful internally within C++ (e.g., rcpp_nufft_type1,
-#' rcpp_conv_nd_full) where there's no R<->C++ boundary crossing.
-#'
-#' TL;DR: DO NOT add Rcpp FFT fallback here. Base R fft() is optimal.
+#' Heuristic used here: switch to Rcpp batch FFT when n_extra > 1.
+#' See dev/scripts/bench_fft2d_methods.R for measurements.
 #'
 #' @param arr Input array (N1, N2, ..., Nd, dh) where last dim is bandwidth
 #' @param dx Number of spatial dimensions to FFT (1, 2, or 3)
@@ -56,12 +47,30 @@ apply_fft_spatial <- function(arr, dx, inverse = FALSE) {
   prod_spatial <- prod(spatial_dims)
 
   # -------------------------------------------------------------------
-  # 2D spatial + extra dims (3D+ array): apply fft() on each 2D slice
-
-  # NOTE: We use base R fft() here, NOT Rcpp. See @section above for why.
+  # 2D spatial + extra dims (3D+ array): apply 2D FFT to each slice
+  #
+  # Use OpenMP-parallel rcpp_fft2d_batch when n_extra > 1 (e.g. 25 bandwidths),
+  # which dominates the R<->C++ copy overhead. See dev/scripts/bench_fft2d_methods.R:
+  # at (1024, 1024, 25) the Rcpp batch is ~5x faster than the per-slice base R loop
+  # and ~3x faster than mvfft axis-by-axis. For n_extra == 1 we keep base fft().
   # -------------------------------------------------------------------
   if (dx == 2 && ndim >= 3) {
     n_extra <- prod(dims[(dx+1):ndim])
+    n1 <- spatial_dims[1]; n2 <- spatial_dims[2]
+    rcpp_fft2d_fn <- get0("rcpp_fft2d_batch", envir = asNamespace("fastlpr"), inherits = FALSE)
+    if (n_extra > 1 && is.function(rcpp_fft2d_fn)) {
+      arr_cx <- if (is.complex(arr)) arr else as.complex(arr)
+      result <- tryCatch(
+        rcpp_fft2d_fn(arr_cx, as.integer(n1), as.integer(n2), as.integer(n_extra), inverse),
+        error = function(e) NULL
+      )
+      if (!is.null(result)) {
+        if (inverse) result <- result / prod_spatial
+        dim(result) <- dims
+        return(result)
+      }
+      # else fall through to base R loop
+    }
     dim(arr) <- c(spatial_dims, n_extra)
     result <- arr
     if (inverse) {
@@ -78,10 +87,26 @@ apply_fft_spatial <- function(arr, dx, inverse = FALSE) {
   }
 
   # -------------------------------------------------------------------
-  # 3D spatial + bandwidth (4D array): apply fft() on each 3D slice
-  # NOTE: We use base R fft() here, NOT Rcpp. See @section above for why.
+  # 3D spatial + bandwidth (4D array): apply 3D FFT to each slice
+  # Use OpenMP-parallel rcpp_fft3d_batch when dh > 1; fall back to base R fft.
   # -------------------------------------------------------------------
   if (dx == 3 && ndim == 4) {
+    n1 <- spatial_dims[1]; n2 <- spatial_dims[2]; n3 <- spatial_dims[3]
+    rcpp_fft3d_fn <- get0("rcpp_fft3d_batch", envir = asNamespace("fastlpr"), inherits = FALSE)
+    if (dh > 1 && is.function(rcpp_fft3d_fn)) {
+      arr_cx <- if (is.complex(arr)) arr else as.complex(arr)
+      result <- tryCatch(
+        rcpp_fft3d_fn(arr_cx, as.integer(n1), as.integer(n2), as.integer(n3),
+                      as.integer(dh), inverse),
+        error = function(e) NULL
+      )
+      if (!is.null(result)) {
+        if (inverse) result <- result / prod_spatial
+        dim(result) <- dims
+        return(result)
+      }
+      # else fall through to base R loop
+    }
     result <- arr
     if (inverse) {
       for (ih in 1:dh) {

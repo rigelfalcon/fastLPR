@@ -111,7 +111,7 @@ fast_fft_nd <- function(arr, dims = NULL, inverse = FALSE, use_rcpp = NULL) {
     rcpp_ok <- rcpp_available()
     if (use_rcpp && rcpp_ok) {
         if (is.complex(arr)) {
-            return(rcpp_fft_nd(as.complex(arr), dims, inverse))
+            return(rcpp_fft_nd(arr, dims, inverse))
         } else {
             return(rcpp_fft_nd_real(as.numeric(arr), dims, inverse))
         }
@@ -177,7 +177,7 @@ fast_interp_nd <- function(grid_vals, arr, points, use_rcpp = NULL) {
     rcpp_ok <- rcpp_available()
     if (use_rcpp && rcpp_ok) {
         if (is.complex(arr)) {
-            return(rcpp_interp_nd_complex(grid_vals, as.complex(arr), as.matrix(points)))
+            return(rcpp_interp_nd_complex(grid_vals, arr, as.matrix(points)))
         } else {
             return(rcpp_interp_nd(grid_vals, as.numeric(arr), as.matrix(points)))
         }
@@ -265,7 +265,7 @@ fast_aperm <- function(arr, perm, use_rcpp = NULL) {
     rcpp_ok <- rcpp_available()
     if (use_rcpp && rcpp_ok) {
         if (is.complex(arr)) {
-            return(rcpp_aperm_complex(as.complex(arr), as.integer(dims), as.integer(perm)))
+            return(rcpp_aperm_complex(arr, as.integer(dims), as.integer(perm)))
         } else {
             return(rcpp_aperm(as.numeric(arr), as.integer(dims), as.integer(perm)))
         }

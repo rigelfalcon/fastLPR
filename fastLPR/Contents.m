@@ -41,4 +41,4 @@
 % References:
 % [1] Wang, Y., Li, M., Paz-Linares, D., & Valdes-Sosa, P. A. (2025).
 %     fastLPR: Fast Local Polynomial Regression via NUFFT in MATLAB,
-%     Python, and R. Journal of Statistical Software.
+%     Python, and R. Submitted.
