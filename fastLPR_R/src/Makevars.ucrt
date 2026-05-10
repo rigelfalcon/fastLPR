@@ -23,7 +23,7 @@ ifdef LIB_FFTW3
     HAVE_FFTW3 := $(wildcard $(LIB_FFTW3)/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3),)
         FFTW3_CFLAGS = -I$(LIB_FFTW3)/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = $(LIB_FFTW3)/lib/libfftw3.a
+        FFTW3_LIBS = $(LIB_FFTW3)/lib/libfftw3.a $(LIB_FFTW3)/lib/libfftw3f.a
     endif
 endif
 
@@ -33,7 +33,7 @@ ifndef FFTW3_LIBS
         HAVE_FFTW3 := $(wildcard $(R_TOOLS_SOFT)/lib/libfftw3.a)
         ifneq ($(HAVE_FFTW3),)
             FFTW3_CFLAGS = -I$(R_TOOLS_SOFT)/include -DARMA_USE_FFTW3
-            FFTW3_LIBS = $(R_TOOLS_SOFT)/lib/libfftw3.a
+            FFTW3_LIBS = $(R_TOOLS_SOFT)/lib/libfftw3.a $(R_TOOLS_SOFT)/lib/libfftw3f.a
         endif
     endif
 endif
@@ -44,7 +44,7 @@ ifndef FFTW3_LIBS
     HAVE_FFTW3_45 := $(wildcard C:/rtools45/ucrt64/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3_45),)
         FFTW3_CFLAGS = -IC:/rtools45/ucrt64/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = C:/rtools45/ucrt64/lib/libfftw3.a
+        FFTW3_LIBS = C:/rtools45/ucrt64/lib/libfftw3.a C:/rtools45/ucrt64/lib/libfftw3f.a
     endif
 endif
 
@@ -53,7 +53,7 @@ ifndef FFTW3_LIBS
     HAVE_FFTW3_44 := $(wildcard C:/rtools44/ucrt64/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3_44),)
         FFTW3_CFLAGS = -IC:/rtools44/ucrt64/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = C:/rtools44/ucrt64/lib/libfftw3.a
+        FFTW3_LIBS = C:/rtools44/ucrt64/lib/libfftw3.a C:/rtools44/ucrt64/lib/libfftw3f.a
     endif
 endif
 
@@ -62,7 +62,7 @@ ifndef FFTW3_LIBS
     HAVE_FFTW3_43 := $(wildcard C:/rtools43/ucrt64/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3_43),)
         FFTW3_CFLAGS = -IC:/rtools43/ucrt64/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = C:/rtools43/ucrt64/lib/libfftw3.a
+        FFTW3_LIBS = C:/rtools43/ucrt64/lib/libfftw3.a C:/rtools43/ucrt64/lib/libfftw3f.a
     endif
 endif
 
@@ -71,7 +71,7 @@ ifndef FFTW3_LIBS
     HAVE_FFTW3_D45 := $(wildcard D:/rtools45/ucrt64/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3_D45),)
         FFTW3_CFLAGS = -ID:/rtools45/ucrt64/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = D:/rtools45/ucrt64/lib/libfftw3.a
+        FFTW3_LIBS = D:/rtools45/ucrt64/lib/libfftw3.a D:/rtools45/ucrt64/lib/libfftw3f.a
     endif
 endif
 
@@ -80,7 +80,7 @@ ifndef FFTW3_LIBS
     HAVE_FFTW3_D44 := $(wildcard D:/rtools44/ucrt64/lib/libfftw3.a)
     ifneq ($(HAVE_FFTW3_D44),)
         FFTW3_CFLAGS = -ID:/rtools44/ucrt64/include -DARMA_USE_FFTW3
-        FFTW3_LIBS = D:/rtools44/ucrt64/lib/libfftw3.a
+        FFTW3_LIBS = D:/rtools44/ucrt64/lib/libfftw3.a D:/rtools44/ucrt64/lib/libfftw3f.a
     endif
 endif
 

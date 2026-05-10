@@ -237,8 +237,20 @@ try
     end
     % Select s_0 at the chosen bandwidth
     if ~isempty(regs.gcv_yhat) && isfield(regs.gcv_yhat, 'id1se')
-        id1se = regs.gcv_yhat.id1se;
-        s0_selected = s0_all(regs.ndcolon{:}, id1se);
+        id1se_global = regs.gcv_yhat.id1se;
+        % Convert global index to local index within good bandwidths
+        % s0_all has bad bandwidths removed, so its bandwidth dimension = dh (good only)
+        if isfield(regs, 'ihbad') && any(regs.ihbad)
+            ihgood = find(~regs.ihbad);
+            id1se_local = find(ihgood == id1se_global(1));
+            if isempty(id1se_local)
+                % id1se points to a removed bandwidth — fall back to closest good one
+                [~, id1se_local] = min(abs(ihgood - id1se_global(1)));
+            end
+        else
+            id1se_local = id1se_global(1);
+        end
+        s0_selected = s0_all(regs.ndcolon{:}, id1se_local);
     else
         % Single bandwidth or no GCV: use first (only) slice
         if ndims(s0_all) > regs.dx || (regs.dx == 1 && size(s0_all, 2) > 1)

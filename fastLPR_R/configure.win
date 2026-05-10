@@ -24,7 +24,8 @@ if [ -n "${LIB_FFTW3}" ]; then
     if [ -f "${LIB_FFTW3}/lib/libfftw3.a" ]; then
         FFTW3_CFLAGS="-I${LIB_FFTW3}/include"
         # Use static linking: specify .a file directly to avoid DLL issues
-        FFTW3_LIBS="${LIB_FFTW3}/lib/libfftw3.a"
+        # Link both double (libfftw3) and single precision (libfftw3f) — both are used.
+        FFTW3_LIBS="${LIB_FFTW3}/lib/libfftw3.a ${LIB_FFTW3}/lib/libfftw3f.a"
         FFTW3_DEFINE="-DARMA_USE_FFTW3"
         FFTW3_FOUND="yes (LIB_FFTW3: ${LIB_FFTW3})"
     fi
@@ -36,7 +37,7 @@ fi
 if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${R_TOOLS_SOFT}" ]; then
     if [ -f "${R_TOOLS_SOFT}/lib/libfftw3.a" ]; then
         FFTW3_CFLAGS="-I${R_TOOLS_SOFT}/include"
-        FFTW3_LIBS="${R_TOOLS_SOFT}/lib/libfftw3.a"
+        FFTW3_LIBS="${R_TOOLS_SOFT}/lib/libfftw3.a ${R_TOOLS_SOFT}/lib/libfftw3f.a"
         FFTW3_DEFINE="-DARMA_USE_FFTW3"
         FFTW3_FOUND="yes (R_TOOLS_SOFT: ${R_TOOLS_SOFT})"
     fi
@@ -57,7 +58,7 @@ if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS45_HOME}" ]; then
     FFTW_PATH="${RTOOLS45_MSYS}/ucrt64"
     if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
         FFTW3_CFLAGS="-I${FFTW_PATH}/include"
-        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a ${FFTW_PATH}/lib/libfftw3f.a"
         FFTW3_DEFINE="-DARMA_USE_FFTW3"
         FFTW3_FOUND="yes (RTOOLS45_HOME: ${FFTW_PATH})"
     fi
@@ -68,7 +69,7 @@ if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS44_HOME}" ]; then
     FFTW_PATH="${RTOOLS44_MSYS}/ucrt64"
     if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
         FFTW3_CFLAGS="-I${FFTW_PATH}/include"
-        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a ${FFTW_PATH}/lib/libfftw3f.a"
         FFTW3_DEFINE="-DARMA_USE_FFTW3"
         FFTW3_FOUND="yes (RTOOLS44_HOME: ${FFTW_PATH})"
     fi
@@ -79,7 +80,7 @@ if [ "${FFTW3_FOUND}" = "no" ] && [ -n "${RTOOLS43_HOME}" ]; then
     FFTW_PATH="${RTOOLS43_MSYS}/ucrt64"
     if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
         FFTW3_CFLAGS="-I${FFTW_PATH}/include"
-        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+        FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a ${FFTW_PATH}/lib/libfftw3f.a"
         FFTW3_DEFINE="-DARMA_USE_FFTW3"
         FFTW3_FOUND="yes (RTOOLS43_HOME: ${FFTW_PATH})"
     fi
@@ -97,7 +98,7 @@ if [ "${FFTW3_FOUND}" = "no" ]; then
         FFTW_PATH="${RTOOLS_PATH}/ucrt64"
         if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
             FFTW3_CFLAGS="-I${FFTW_PATH}/include"
-            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a ${FFTW_PATH}/lib/libfftw3f.a"
             FFTW3_DEFINE="-DARMA_USE_FFTW3"
             FFTW3_FOUND="yes (${FFTW_PATH} static)"
             break
@@ -106,7 +107,7 @@ if [ "${FFTW3_FOUND}" = "no" ]; then
         FFTW_PATH="${RTOOLS_PATH}/mingw64"
         if [ -f "${FFTW_PATH}/lib/libfftw3.a" ]; then
             FFTW3_CFLAGS="-I${FFTW_PATH}/include"
-            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a"
+            FFTW3_LIBS="${FFTW_PATH}/lib/libfftw3.a ${FFTW_PATH}/lib/libfftw3f.a"
             FFTW3_DEFINE="-DARMA_USE_FFTW3"
             FFTW3_FOUND="yes (${FFTW_PATH} static)"
             break

@@ -89,12 +89,23 @@ cv_fastlpr <- function(x, y, h = NULL, opt = NULL) {
     has_bw_dim <- !is.null(dim(s0_all)) && s0_ndim > regs$dx
 
     if (has_bw_dim && !is.null(regs$gcv_yhat) && !is.null(regs$gcv_yhat$id1se)) {
-      ih <- regs$gcv_yhat$id1se
+      ih_global <- regs$gcv_yhat$id1se
+      # Convert global index to local index within good bandwidths
+      # s0_all has bad bandwidths removed, so its bandwidth dimension = dh (good only)
+      if (!is.null(regs$ihbad) && any(regs$ihbad)) {
+        ihgood <- which(!regs$ihbad)
+        ih_local <- match(ih_global, ihgood)
+        if (is.na(ih_local)) {
+          ih_local <- which.min(abs(ihgood - ih_global))
+        }
+      } else {
+        ih_local <- ih_global
+      }
       if (regs$dx == 1) {
-        s0_selected <- Re(s0_all[, ih])
+        s0_selected <- Re(s0_all[, ih_local])
       } else {
         idx <- rep(list(quote(expr = )), regs$dx)
-        s0_selected <- Re(do.call(`[`, c(list(s0_all), idx, ih)))
+        s0_selected <- Re(do.call(`[`, c(list(s0_all), idx, ih_local)))
       }
     } else {
       # No bandwidth dimension (dh=1 was dropped) or no GCV

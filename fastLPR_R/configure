@@ -37,7 +37,7 @@ echo "Checking for FFTW3..."
 if [ -n "${LIB_FFTW3}" ]; then
     if [ -f "${LIB_FFTW3}/lib/libfftw3.a" ] || [ -f "${LIB_FFTW3}/lib/libfftw3.so" ] || [ -f "${LIB_FFTW3}/lib/libfftw3.dylib" ]; then
         FFTW3_CFLAGS="-I${LIB_FFTW3}/include"
-        FFTW3_LIBS="-L${LIB_FFTW3}/lib -lfftw3"
+        FFTW3_LIBS="-L${LIB_FFTW3}/lib -lfftw3 -lfftw3f"
         FFTW3_FOUND="yes (LIB_FFTW3: ${LIB_FFTW3})"
     fi
 fi
@@ -50,6 +50,12 @@ if [ "${FFTW3_FOUND}" = "no" ]; then
         if pkg-config --exists fftw3 2>/dev/null; then
             FFTW3_CFLAGS=$(pkg-config --cflags fftw3 2>/dev/null)
             FFTW3_LIBS=$(pkg-config --libs fftw3 2>/dev/null)
+            # Also link single-precision library (required for accuracy <= 4 path)
+            if pkg-config --exists fftw3f 2>/dev/null; then
+                FFTW3_LIBS="${FFTW3_LIBS} $(pkg-config --libs fftw3f 2>/dev/null)"
+            else
+                FFTW3_LIBS="${FFTW3_LIBS} -lfftw3f"
+            fi
             FFTW3_FOUND="yes (pkg-config)"
         fi
     fi
@@ -74,8 +80,8 @@ int main() {
 EOF
 
     # Try standard paths first
-    if $CC $CFLAGS -o conftest conftest.c -lfftw3 -lm >/dev/null 2>&1; then
-        FFTW3_LIBS="-lfftw3"
+    if $CC $CFLAGS -o conftest conftest.c -lfftw3 -lfftw3f -lm >/dev/null 2>&1; then
+        FFTW3_LIBS="-lfftw3 -lfftw3f"
         FFTW3_FOUND="yes (system)"
     fi
 
@@ -96,9 +102,9 @@ EOF
 
         for PREFIX_PATH in ${SEARCH_PATHS}; do
             if [ -d "${PREFIX_PATH}/include" ] && [ -d "${PREFIX_PATH}/lib" ]; then
-                if $CC $CFLAGS -I${PREFIX_PATH}/include -L${PREFIX_PATH}/lib -o conftest conftest.c -lfftw3 -lm >/dev/null 2>&1; then
+                if $CC $CFLAGS -I${PREFIX_PATH}/include -L${PREFIX_PATH}/lib -o conftest conftest.c -lfftw3 -lfftw3f -lm >/dev/null 2>&1; then
                     FFTW3_CFLAGS="-I${PREFIX_PATH}/include"
-                    FFTW3_LIBS="-L${PREFIX_PATH}/lib -lfftw3"
+                    FFTW3_LIBS="-L${PREFIX_PATH}/lib -lfftw3 -lfftw3f"
                     FFTW3_FOUND="yes (${PREFIX_PATH})"
                     break
                 fi
