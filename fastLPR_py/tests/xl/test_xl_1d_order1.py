@@ -116,12 +116,12 @@ class TestXL1DLprOrder1:
         res = cv_fastlpr(x_ref, y_ref, h=hlist_ref, options=options)
         python_time = time.perf_counter() - start_time
 
-        assert_gcv_fields(res.gcv)
+        assert_gcv_fields(res.gcv_yhat)
 
         # Extract Python results
         h1se_py = float(np.asarray(res.h).item())
-        id1se_py = int(res.gcv['id1se'])  # 0-indexed
-        gcv_m_py = np.asarray(res.gcv['gcv_m']).ravel()
+        id1se_py = int(res.gcv_yhat['id1se'])  # 0-indexed
+        gcv_m_py = np.asarray(res.gcv_yhat['gcv_m']).ravel()
         yhat_py = np.asarray(res.yhat).ravel()
 
         print(f"\n--- Python Results ---")
@@ -239,7 +239,7 @@ class TestXL1DLprOrder1:
 
         # Compute metrics
         bw_maxerr = abs(float(np.asarray(res.h).item()) - h1se_ref)
-        gcv_m_py = np.asarray(res.gcv['gcv_m']).ravel()
+        gcv_m_py = np.asarray(res.gcv_yhat['gcv_m']).ravel()
         gcv_abs_err = np.abs(gcv_m_py - gcv_m_ref)
         gcv_denom = np.maximum(np.abs(gcv_m_ref), 1e-10)
         gcv_rel_err = np.max(gcv_abs_err / gcv_denom)

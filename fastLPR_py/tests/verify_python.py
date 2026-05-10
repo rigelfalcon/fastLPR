@@ -359,7 +359,7 @@ def test_1d_order1(mat):
     res = cv_fastlpr(x, y, hlist, opt)
 
     # Python uses cv_result instead of gcv_yhat
-    cv_result = res.gcv or {}
+    cv_result = res.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -393,7 +393,7 @@ def test_2d_order1(mat):
     res = cv_fastlpr(x, y, hlist, opt)
 
     # Python uses cv_result instead of gcv_yhat
-    cv_result = res.gcv or {}
+    cv_result = res.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -425,7 +425,7 @@ def test_1d_order2(mat):
     res = cv_fastlpr(x, y, hlist, opt)
 
     # Python uses cv_result instead of gcv_yhat
-    cv_result = res.gcv or {}
+    cv_result = res.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -459,7 +459,7 @@ def test_2d_order2(mat):
     res = cv_fastlpr(x, y, hlist, opt)
 
     # Python uses cv_result instead of gcv_yhat
-    cv_result = res.gcv or {}
+    cv_result = res.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -493,7 +493,7 @@ def test_complex(mat):
     res = cv_fastlpr(x, y, hlist, opt)
 
     # Python uses cv_result instead of gcv_yhat
-    cv_result = res.gcv or {}
+    cv_result = res.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -529,7 +529,7 @@ def test_hetero_1d(mat):
         opt_var["random_matrix"] = np.asarray(mat["dof_random_vectors_var"])
     res_var = cv_fastlpr(x, residuals**2, hlist, opt_var)
 
-    cv_result = res_mean.gcv or {}
+    cv_result = res_mean.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),
@@ -565,7 +565,7 @@ def test_hetero_2d(mat):
         opt_var["random_matrix"] = np.asarray(mat["dof_random_vectors_var"])
     res_var = cv_fastlpr(x, residuals**2, hlist, opt_var)
 
-    cv_result = res_mean.gcv or {}
+    cv_result = res_mean.gcv_yhat or {}
     return {
         "n": len(x),
         "gcv_py": cv_result.get("scores"),

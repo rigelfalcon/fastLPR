@@ -125,23 +125,23 @@ class TestXL10Hetero2D:
 
         py_time = time.perf_counter() - start_time
 
-        assert_gcv_fields(res_mean.gcv)
-        assert_gcv_fields(res_var.gcv)
+        assert_gcv_fields(res_mean.gcv_yhat)
+        assert_gcv_fields(res_var.gcv_yhat)
 
         # ====================================================================
         # Extract Python results
         # ====================================================================
 
         # Mean results
-        gcv_m_py = np.asarray(res_mean.gcv['gcv_m']).ravel()
+        gcv_m_py = np.asarray(res_mean.gcv_yhat['gcv_m']).ravel()
         h1se_mean_py = np.asarray(res_mean.h).ravel()
-        id1se_mean_py = res_mean.gcv['id1se']  # 0-based
+        id1se_mean_py = res_mean.gcv_yhat['id1se']  # 0-based
         yhat_mean_py = np.asarray(res_mean.yhat).ravel()
 
         # Variance results
-        gcv_var_py = np.asarray(res_var.gcv['gcv_m']).ravel()
+        gcv_var_py = np.asarray(res_var.gcv_yhat['gcv_m']).ravel()
         h1se_var_py = np.asarray(res_var.h).ravel()
-        id1se_var_py = res_var.gcv['id1se']  # 0-based
+        id1se_var_py = res_var.gcv_yhat['id1se']  # 0-based
         yhat_var_py = np.asarray(res_var.yhat).ravel()
 
         # ====================================================================

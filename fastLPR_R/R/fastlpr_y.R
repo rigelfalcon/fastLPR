@@ -363,6 +363,15 @@ row_sd <- function(x) {
 
       # Compute penalty mean and SD
       pdof_samples <- 1 - trace_H / Tx  # Shape: (dh, num_dof_sample)
+
+      # Complex y adjustment: trace_H estimated from real probe vectors only
+      # captures the real-part DOF; the complex penalty is pdof = 2*pdof_real - 1.
+      # Mirrors MATLAB fastlpr_dof.m:99 and Python regression.py:1311-1312.
+      y_is_complex <- isFALSE(regs$y_isreal)
+      if (y_is_complex) {
+        pdof_samples <- 2 * pdof_samples - 1
+      }
+
       pdof_samples_dims <- dim(pdof_samples)
       # Two-step clamping: first to [0,1], then enforce minimum 0.01
       pdof_samples_clamped <- pmax(0, pmin(1, pdof_samples))  # First: clamp to [0,1]
@@ -375,6 +384,14 @@ row_sd <- function(x) {
         penalty_sd <- row_sd(penalty_samples)  # Shape: (dh,)
       } else {
         penalty_sd <- rep(0, dh)
+      }
+
+      # For complex y, recompute reported DOF from the adjusted (clamped) penalty:
+      #   dof = N * (1 - pdof_complex_clamped)
+      # This matches Python regression.py:1334.
+      if (y_is_complex) {
+        pdof_mean_clamped <- rowMeans(pdof_samples_clamped)
+        dof_mean <- Tx * (1 - pdof_mean_clamped)
       }
 
       # Store results
@@ -429,6 +446,13 @@ row_sd <- function(x) {
         stop(sprintf("Unexpected mq dimensions for dx=%d: %s", dx, paste(mq_dims, collapse=" x ")))
       }
 
+      # Clamp Inf/NaN in grid values before interpolation.
+      # For extreme bandwidths (h << grid spacing), Cramer's rule may produce
+      # Inf due to near-singular systems. MATLAB avoids this via spline
+      # interpolation which smooths out isolated Inf values. We clamp to 0
+      # (equivalent to "no information"), yielding MSE ~ Var(y) and large GCV.
+      values[!is.finite(values)] <- 0
+
       # Interpolate to data points
       interp <- fastlpr_gridinterp(regs, values)
       yhat_data[, ih] <- interp$evaluate(regs$xraw)
@@ -445,11 +469,9 @@ row_sd <- function(x) {
       rss <- colSums(abs(residual)^2)  # Vector of length dh
       mse <- colMeans(abs(residual)^2)  # Vector of length dh
 
-      # Mark bandwidths with essentially zero yhat as NaN (match MATLAB behavior)
-      yhat_var <- apply(yhat_data, 2, var)  # Variance for each bandwidth
-      invalid_bandwidth <- yhat_var < .Machine$double.eps * 1e6  # Essentially constant
-      mse[invalid_bandwidth] <- NaN  # Mark as invalid (will be skipped by which.min)
-
+      # GCV scores: let GCV naturally penalize bad bandwidths (MATLAB does not
+      # artificially mark any bandwidth as NaN — underfitting bandwidths simply
+      # produce large MSE and are never selected by which.min/1-SE rule)
       gcv_scores <- mse * pdof_inv_m[, 1]  # Vector of length dh
 
       # Find minimum GCV bandwidth

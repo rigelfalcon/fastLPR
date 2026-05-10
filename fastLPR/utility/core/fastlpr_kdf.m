@@ -177,8 +177,9 @@ switch order
     case 0
         % Order 0: Nadaraya-Watson kernel
         kd=kernel_function(xgrid,[],h,kernel_type);
-        % Check if kernel sum is zero (bandwidth too small)
-        ihbad=squeeze(~abs(sum(kd,(1:dx))));
+        % Check if kernel sum is too small (bandwidth too small for grid)
+        % Use eps*10 threshold to catch underflow without filtering normal values
+        ihbad=squeeze(abs(sum(kd,(1:dx))) < eps*10);
 
     otherwise
         % Order >= 1: Local polynomial kernel
@@ -193,12 +194,12 @@ switch order
         % Compute design matrix elements: S_ij = K(x) * x^i * x^j
         kd=lwp.Sxfun(kd,xgrid);
 
-        % Check if kernel sum (kd{1}) is zero (bandwidth too small)
+        % Check if kernel sum (kd{1}) is too small (bandwidth too small for grid)
         % CRITICAL: Only check kd{1} (kernel sum), NOT cross terms (kd{2}, etc.)!
         % After removing abs() from coordinate normalization, cross terms are
         % CORRECTLY near machine epsilon due to symmetric cancellation.
         % Checking cross terms would incorrectly mark valid bandwidths as bad.
-        ihbad=squeeze(~abs(sum(kd{1},(1:dx))));
+        ihbad=squeeze(abs(sum(kd{1},(1:dx))) < eps*10);
 end
 end
 

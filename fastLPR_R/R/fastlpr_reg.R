@@ -234,29 +234,26 @@ fastlpr_reg <- function(regs, y_ft) {
 #' @return s_reg Regularized design matrix
 #' @keywords internal
 apply_adaptive_regularization_r <- function(regs) {
-  # CRITICAL: MATLAB uses order+1 for regularization, NOT lwp$nt
-  # This applies regularization to the first (order+1) diagonal elements only
-  # For 2D order 2: lwp$nt=6 (polynomial terms), but MATLAB uses nt=3 (order+1)
-  # This is intentional - only regularize lower-order term diagonals
-  nt <- regs$opt$order + 1  # Match MATLAB: nt = order + 1
+  # Regularize ALL diagonal elements of the design matrix S.
+  # For a (nt x nt) system stored in lower-triangular form, diagonal indices
+  # are k*(k+1)/2 for k = 1, ..., nt.
+  # Using lwp$nt (number of polynomial terms = system size) ensures all
+  # diagonal elements are stabilized, preventing Inf/NaN from Cramer's rule
+  # when any bandwidth produces near-zero kernel sums.
+  nt <- regs$lwp$nt
 
-  # Find the maximum diagonal element across all spatial points
-  max_diag <- max(abs(regs$s[[1]]))  # Start with S11
+  # Find the maximum diagonal element across all spatial points and bandwidths
+  max_diag <- max(abs(regs$s[[1]]))
   for (k in 2:nt) {
-    diag_idx <- k * (k + 1) / 2  # Diagonal index in lower triangular storage
+    diag_idx <- k * (k + 1) / 2
     max_diag <- max(max_diag, max(abs(regs$s[[diag_idx]])))
   }
 
-  # Add a small, fixed regularization relative to the max diagonal
-  # alpha = 1e-6: regularize at 0.0001% of maximum signal
   alpha <- 1e-6
   lambda_fixed <- alpha * max_diag
 
-  # Apply regularization to diagonal elements: S_reg = S + lambda*I
-  # OPTIMIZATION: Deep copy to avoid R's copy-on-modify overhead
-  # When s_reg shares references with regs$s, subsequent mfun calls
-  # trigger expensive copy operations. By copying upfront, we avoid this.
-  s_reg <- lapply(regs$s, function(x) x + 0)  # Force copy via arithmetic
+  # Apply regularization to ALL diagonal elements: S_reg = S + lambda*I
+  s_reg <- lapply(regs$s, function(x) x + 0)  # Force copy
   for (k in 1:nt) {
     diag_idx <- k * (k + 1) / 2
     s_reg[[diag_idx]] <- s_reg[[diag_idx]] + lambda_fixed

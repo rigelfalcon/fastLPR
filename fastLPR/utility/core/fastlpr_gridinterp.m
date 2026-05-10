@@ -57,8 +57,8 @@ if nargin<4 || isempty(method)
     method ='griddedInterpolant';
 end
 if nargin<5 || isempty(opt)
-    % Default: spline interpolation with linear extrapolation
-    opt.Method='spline';
+    % Default: linear interpolation with linear extrapolation
+    opt.Method='linear';
     opt.ExtrapolationMethod ='linear';
 end
 

@@ -213,8 +213,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // rcpp_conv_nd_full
-ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft, IntegerVector L_vec, int dh, int dy, IntegerMatrix qout, bool y_isreal);
-RcppExport SEXP _fastlpr_rcpp_conv_nd_full(SEXP kdfSEXP, SEXP y_ftSEXP, SEXP L_vecSEXP, SEXP dhSEXP, SEXP dySEXP, SEXP qoutSEXP, SEXP y_isrealSEXP) {
+ComplexVector rcpp_conv_nd_full(ComplexVector kdf, ComplexVector y_ft, IntegerVector L_vec, int dh, int dy, IntegerMatrix qout, bool y_isreal, bool use_single);
+RcppExport SEXP _fastlpr_rcpp_conv_nd_full(SEXP kdfSEXP, SEXP y_ftSEXP, SEXP L_vecSEXP, SEXP dhSEXP, SEXP dySEXP, SEXP qoutSEXP, SEXP y_isrealSEXP, SEXP use_singleSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -225,7 +225,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type dy(dySEXP);
     Rcpp::traits::input_parameter< IntegerMatrix >::type qout(qoutSEXP);
     Rcpp::traits::input_parameter< bool >::type y_isreal(y_isrealSEXP);
-    rcpp_result_gen = Rcpp::wrap(rcpp_conv_nd_full(kdf, y_ft, L_vec, dh, dy, qout, y_isreal));
+    Rcpp::traits::input_parameter< bool >::type use_single(use_singleSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_conv_nd_full(kdf, y_ft, L_vec, dh, dy, qout, y_isreal, use_single));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -335,7 +336,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fastlpr_rcpp_broadcast_multiply", (DL_FUNC) &_fastlpr_rcpp_broadcast_multiply, 5},
     {"_fastlpr_rcpp_broadcast_multiply_nd", (DL_FUNC) &_fastlpr_rcpp_broadcast_multiply_nd, 5},
     {"_fastlpr_rcpp_extract_subarray", (DL_FUNC) &_fastlpr_rcpp_extract_subarray, 4},
-    {"_fastlpr_rcpp_conv_nd_full", (DL_FUNC) &_fastlpr_rcpp_conv_nd_full, 7},
+    {"_fastlpr_rcpp_conv_nd_full", (DL_FUNC) &_fastlpr_rcpp_conv_nd_full, 8},
     {"_fastlpr_rcpp_gaussian_kernel_grid", (DL_FUNC) &_fastlpr_rcpp_gaussian_kernel_grid, 2},
     {"_fastlpr_rcpp_nufft_type1", (DL_FUNC) &_fastlpr_rcpp_nufft_type1, 4},
     {"_fastlpr_rcpp_nufft_type1_complex", (DL_FUNC) &_fastlpr_rcpp_nufft_type1_complex, 4},

@@ -111,14 +111,14 @@ class TestXL06LPR2DOrder1:
         result = cv_fastlpr(x_ref, y_ref, h=hlist_ref, options=options)
         py_time = time.perf_counter() - start_time
 
-        assert_gcv_fields(result.gcv)
+        assert_gcv_fields(result.gcv_yhat)
 
         # ====================================================================
         # Extract Python results
         # ====================================================================
         h_selected_py = np.asarray(result.h).ravel()
-        id1se_py = result.gcv['id1se']  # 0-based Python index
-        gcv_m_py = np.asarray(result.gcv['gcv_m']).ravel()
+        id1se_py = result.gcv_yhat['id1se']  # 0-based Python index
+        gcv_m_py = np.asarray(result.gcv_yhat['gcv_m']).ravel()
         yhat_py = np.asarray(result.yhat).ravel()
 
         # ====================================================================

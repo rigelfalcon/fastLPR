@@ -61,8 +61,8 @@ rcpp_extract_subarray <- function(arr, dims, starts, ends) {
     .Call(`_fastlpr_rcpp_extract_subarray`, arr, dims, starts, ends)
 }
 
-rcpp_conv_nd_full <- function(kdf, y_ft, L_vec, dh, dy, qout, y_isreal = TRUE) {
-    .Call(`_fastlpr_rcpp_conv_nd_full`, kdf, y_ft, L_vec, dh, dy, qout, y_isreal)
+rcpp_conv_nd_full <- function(kdf, y_ft, L_vec, dh, dy, qout, y_isreal = TRUE, use_single = FALSE) {
+    .Call(`_fastlpr_rcpp_conv_nd_full`, kdf, y_ft, L_vec, dh, dy, qout, y_isreal, use_single)
 }
 
 rcpp_gaussian_kernel_grid <- function(xgrid, h) {

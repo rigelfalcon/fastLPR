@@ -98,7 +98,7 @@ class TestE2ELpr2D:
         assert 0.1 <= regs.h[0] <= 0.6
         assert 0.1 <= regs.h[1] <= 0.6
         # GCV scores should exist
-        assert regs.gcv is not None
+        assert regs.gcv_yhat is not None
 
 
 if __name__ == "__main__":

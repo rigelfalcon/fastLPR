@@ -134,7 +134,7 @@ opt=set_defaults(opt,'dof_seed',42);  % Random seed for DOF estimation (for repr
 
 if ~isfield(opt,'y_grid_opt')
     % 'linear','cubic' or 'spline' et al. see griddedInterpolant
-    opt.y_grid_opt.Method='spline';
+    opt.y_grid_opt.Method='linear';
     opt.y_grid_opt.ExtrapolationMethod='linear';
 end
 

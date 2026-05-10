@@ -61,7 +61,7 @@ function s_reg = apply_adaptive_regularization(regs)
 % 2. Scales naturally with local signal power
 % 3. Simple and computationally efficient
 
-nt = regs.opt.order + 1;  % Size of design matrix (order+1) x (order+1)
+nt = regs.lwp.nt;  % Regularize ALL diagonal elements of the design matrix
 
 % Find the maximum diagonal element across all spatial points
 max_diag = max(abs(regs.s{1}(:)));  % Start with S11

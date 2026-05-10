@@ -29,7 +29,7 @@ class RegressionOutput:
         yhat: Fitted values at data points
         grid: Evaluation grid as tuple of arrays
         h: Selected bandwidth (scalar or array)
-        gcv: GCV results dict with keys: h1se, idmin, id1se, gcv_mean, gcv_dof, gcv_scores
+        gcv: GCV results dict with keys: h1se, hmin, idmin, id1se, gcv_m, gcv_sd, dof, dof_stderr
         fpp_yhat: Interpolant object for prediction at new points
         metadata: Additional info (options, dimensions, etc.)
         dof: Estimated degrees of freedom
@@ -40,7 +40,7 @@ class RegressionOutput:
     yhat: np.ndarray
     grid: tuple[np.ndarray, ...]
     h: np.ndarray
-    gcv: Optional[Dict[str, object]] = None
+    gcv_yhat: Optional[Dict[str, object]] = None
     fpp_yhat: Optional[object] = None
     metadata: Optional[Dict[str, object]] = None
     dof: Optional[float] = None

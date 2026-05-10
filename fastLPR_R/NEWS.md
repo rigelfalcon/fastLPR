@@ -1,3 +1,25 @@
+# fastlpr (development)
+
+## Numerical Stability & Cross-Language Consistency
+
+### Fixed
+
+* Regularize all diagonal elements of the design matrix (was only order+1, missing S33 for 2D order 1)
+* ihbad threshold: use `< eps*10` instead of `== 0` to detect underflow bandwidths (matches Python)
+* Clamp Inf/NaN grid values to 0 before interpolation (prevents NaN propagation from extreme bandwidths)
+* Remove artificial `invalid_bandwidth` NaN assignment in GCV — let GCV naturally penalize bad bandwidths
+
+## Performance Optimizations
+
+### Changed
+
+* Rcpp convolution pipeline: fused broadcast multiply + IFFT + extraction into single C++ call (rcpp_conv_nd_full) with OpenMP parallelism
+* Single-precision FFTW3 path for accuracy <= 4, reducing FFT time by ~40%
+* Eliminated redundant as.complex() copies in Rcpp wrapper guards
+* Eliminated 1.6GB broadcast array copy in DoF mfun computation via as.vector() recycling
+* Pre-computed NUFFT of y and ones vector, reused across polynomial terms
+* Overall: R within 1.5x of MATLAB speed (down from 8x)
+
 # fastlpr 1.0.1
 
 ## CRAN Resubmission (2026-04-13)
@@ -5,15 +27,6 @@
 ### Fixed
 
 * CRAN reviewer feedback compliance fixes
-
-### Performance
-
-* Rcpp convolution pipeline: fused broadcast multiply + IFFT + extraction into single C++ call (rcpp_conv_nd_full) with OpenMP parallelism
-* Single-precision FFTW3 path for accuracy <= 4, reducing FFT time by ~40%
-* Eliminated redundant as.complex() copies in Rcpp wrapper guards
-* Eliminated 1.6GB broadcast array copy in DoF mfun computation via as.vector() recycling
-* Pre-computed NUFFT of y and ones vector, reused across polynomial terms
-* Overall: R within 1.5x of MATLAB speed
 
 # fastlpr 1.0.0
 

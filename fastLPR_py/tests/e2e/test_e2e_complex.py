@@ -91,7 +91,7 @@ class TestE2EComplex:
         # Selected bandwidth should be in range
         assert min(hlist) <= regs.h <= max(hlist)
         # GCV scores should exist
-        assert regs.gcv is not None
+        assert regs.gcv_yhat is not None
 
     def test_complex_gcv_real(self):
         """Complex GCV scores are real-valued (from MATLAB)."""
@@ -109,8 +109,8 @@ class TestE2EComplex:
         regs = cv_fastlpr(x, y, hlist, opt)
 
         # GCV scores should be real (not complex)
-        assert regs.gcv is not None
-        gcv_scores = regs.gcv['gcv_m']
+        assert regs.gcv_yhat is not None
+        gcv_scores = regs.gcv_yhat['gcv_m']
         assert np.all(np.isreal(gcv_scores))
         # GCV scores should be positive
         assert np.all(gcv_scores >= 0)

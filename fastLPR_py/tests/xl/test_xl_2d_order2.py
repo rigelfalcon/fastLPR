@@ -114,12 +114,12 @@ class TestXL2DLprOrder2:
         res = cv_fastlpr(x_ref, y_ref, h=hlist_ref, options=options)
         python_time = time.perf_counter() - start_time
 
-        assert_gcv_fields(res.gcv)
+        assert_gcv_fields(res.gcv_yhat)
 
         # Extract Python results
         h1se_py = np.asarray(res.h).ravel()
-        id1se_py = int(res.gcv['id1se'])  # 0-indexed
-        gcv_m_py = np.asarray(res.gcv['gcv_m']).ravel()
+        id1se_py = int(res.gcv_yhat['id1se'])  # 0-indexed
+        gcv_m_py = np.asarray(res.gcv_yhat['gcv_m']).ravel()
         yhat_py = np.asarray(res.yhat).ravel()
 
         print(f"\n--- Python Results ---")

@@ -5,18 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2026-04-06
+## [Unreleased]
 
 ### Fixed
 
-* PyPI distribution packaging fixes
+* Rename `RegressionOutput.gcv` to `gcv_yhat` for cross-language API consistency (MATLAB/R/Python)
 
 ### Changed
 
 * Shared S matrix: pre-computed once and reused across bandwidth loop iterations
 * dtype downcast: match kdf precision to y_ft to avoid complex128 promotion in IFFT
 * Linear DoF interpolation for N >= 5000 (safe for large datasets, cubic preserved for small)
-* Overall: Python within 1.3x of MATLAB speed
+* Overall: Python within 1.3x of MATLAB speed (down from 8x)
+
+## [1.0.1] - 2026-04-06
+
+### Fixed
+
+* PyPI distribution packaging fixes
 
 ## [1.0.0] - 2026-04-03
 

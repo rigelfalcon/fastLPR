@@ -464,8 +464,8 @@ class TestBandwidthSelectionIntegration:
         assert np.all(result.h > 0)
 
         # Check that GCV scores were computed
-        assert 'gcv_m' in result.gcv
-        assert len(result.gcv['gcv_m']) > 0
+        assert 'gcv_m' in result.gcv_yhat
+        assert len(result.gcv_yhat['gcv_m']) > 0
 
     def test_cv_fastlpr_bandwidth_affects_smoothness(self):
         """UNIT: Larger bandwidth produces smoother fits"""

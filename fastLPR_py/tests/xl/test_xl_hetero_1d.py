@@ -126,7 +126,7 @@ class TestXL09Hetero1D:
         res_mean = cv_fastlpr(x, y, h=hlist, options=options_mean)
         time_mean = time.perf_counter() - start_time
 
-        assert_gcv_fields(res_mean.gcv)
+        assert_gcv_fields(res_mean.gcv_yhat)
 
         # ======================================================================
         # Run Python implementation: Step 2 - Variance estimation
@@ -145,19 +145,19 @@ class TestXL09Hetero1D:
         res_var = cv_fastlpr(x, residuals**2, h=hlist, options=options_var)
         time_var = time.perf_counter() - start_var_time
 
-        assert_gcv_fields(res_var.gcv)
+        assert_gcv_fields(res_var.gcv_yhat)
 
         total_python_time = time_mean + time_var
 
         # Extract Python results
         h1se_mean_py = float(np.asarray(res_mean.h).item())
-        id1se_mean_py = int(res_mean.gcv['id1se'])  # 0-indexed
-        gcv_m_py = np.asarray(res_mean.gcv['gcv_m']).ravel()
+        id1se_mean_py = int(res_mean.gcv_yhat['id1se'])  # 0-indexed
+        gcv_m_py = np.asarray(res_mean.gcv_yhat['gcv_m']).ravel()
         yhat_mean_py = np.asarray(res_mean.yhat).ravel()
 
         h1se_var_py = float(np.asarray(res_var.h).item())
-        id1se_var_py = int(res_var.gcv['id1se'])  # 0-indexed
-        gcv_var_py = np.asarray(res_var.gcv['gcv_m']).ravel()
+        id1se_var_py = int(res_var.gcv_yhat['id1se'])  # 0-indexed
+        gcv_var_py = np.asarray(res_var.gcv_yhat['gcv_m']).ravel()
         yhat_var_py = np.asarray(res_var.yhat).ravel()
 
         print(f"\n--- Python Results ---")

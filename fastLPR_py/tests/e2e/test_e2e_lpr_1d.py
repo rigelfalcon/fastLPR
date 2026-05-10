@@ -139,7 +139,7 @@ class TestE2ELpr1D:
         # Selected bandwidth should be in range
         assert min(hlist) <= regs.h <= max(hlist)
         # GCV scores should exist
-        assert regs.gcv is not None
+        assert regs.gcv_yhat is not None
 
     def test_prediction_accuracy(self):
         """1D prediction accuracy MSE check (from MATLAB)."""

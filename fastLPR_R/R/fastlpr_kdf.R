@@ -248,11 +248,15 @@ get_local_polynomial_kernel <- function(xgrid, h, kernel_type, order, dx, lwp) {
 
     kd_first_dims <- dim(kd[[1]])
     if (length(kd_first_dims) > dx) {
-      # There's a dh dimension - check if kd[[1]] sum is zero for each bandwidth
-      ihbad <- apply(kd[[1]], length(kd_first_dims), function(slice) sum(abs(slice)) == 0)
+      # There's a dh dimension - check if kd[[1]] sum is too small for each bandwidth
+      # Use threshold matching Python: eps*10 catches true underflow without
+      # filtering normal symmetric cancellation (~1e-15)
+      threshold <- .Machine$double.eps * 10
+      ihbad <- apply(kd[[1]], length(kd_first_dims), function(slice) sum(abs(slice)) < threshold)
     } else {
-      # No dh dimension (dh = 1) - just check if the entire kernel is zero
-      ihbad <- sum(abs(kd[[1]])) == 0
+      # No dh dimension (dh = 1) - just check if the entire kernel is too small
+      threshold <- .Machine$double.eps * 10
+      ihbad <- sum(abs(kd[[1]])) < threshold
     }
   }
 
