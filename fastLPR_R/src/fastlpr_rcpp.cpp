@@ -637,6 +637,9 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
 // [[Rcpp::export]]
 ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh,
                                 bool inverse = false) {
+    if (n1 < 1 || n2 < 1 || n3 < 1 || dh < 1) {
+        stop("Dimensions must be positive: n1=%d, n2=%d, n3=%d, dh=%d", n1, n2, n3, dh);
+    }
     size_t total = (size_t)n1 * n2 * n3 * dh;
     if ((size_t)arr.size() != total) {
         stop("Array size mismatch: expected %d, got %d", (int)total, (int)arr.size());
@@ -944,7 +947,7 @@ ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list,
             double abs_den = std::abs(den);
             double sign_den = (den > 0.0) ? 1.0 : ((den < 0.0) ? -1.0 : 0.0);
             double den_reg = std::max(abs_den, eps_reg) * sign_den;
-            if (abs_den < eps_reg) den_reg = eps_reg;
+            if (sign_den == 0.0) den_reg = eps_reg;
 
             // Numerator (complex, involves T)
             std::complex<double> num =
@@ -1008,7 +1011,7 @@ ComplexVector rcpp_cramer_2d_order1(List S_list, List T_list,
             double abs_den = std::abs(den);
             double sign_den = (den > 0.0) ? 1.0 : ((den < 0.0) ? -1.0 : 0.0);
             double den_reg = std::max(abs_den, eps_reg) * sign_den;
-            if (abs_den < eps_reg) den_reg = eps_reg;
+            if (sign_den == 0.0) den_reg = eps_reg;
 
             std::complex<double> num = s5sq*t1 - s2*s5*t3 + s2*s6*t2
                 + s3*s4*t3 - s3*s5*t2 - s4*s6*t1;
