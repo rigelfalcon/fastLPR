@@ -57,6 +57,14 @@ rcpp_broadcast_multiply_nd <- function(kdf, y_ft, spatial_dims, dh, dy) {
     .Call(`_fastlpr_rcpp_broadcast_multiply_nd`, kdf, y_ft, spatial_dims, dh, dy)
 }
 
+rcpp_cramer_3d_order1 <- function(S_list, T_list, n_spatial, dh, regularization) {
+    .Call(`_fastlpr_rcpp_cramer_3d_order1`, S_list, T_list, n_spatial, dh, regularization)
+}
+
+rcpp_cramer_2d_order1 <- function(S_list, T_list, n_spatial, dh, regularization) {
+    .Call(`_fastlpr_rcpp_cramer_2d_order1`, S_list, T_list, n_spatial, dh, regularization)
+}
+
 rcpp_extract_subarray <- function(arr, dims, starts, ends) {
     .Call(`_fastlpr_rcpp_extract_subarray`, arr, dims, starts, ends)
 }

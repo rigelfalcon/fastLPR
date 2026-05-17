@@ -633,8 +633,7 @@ NumericMatrix rcpp_interp_batch_nd(List grid_vectors, NumericVector values,
 
 // Parallel 3D FFT - process all bandwidths in parallel
 // For 4D array (N1, N2, N3, dh), apply 3D FFT to each bandwidth slice
-// This eliminates the expensive aperm() calls in R
-// NOTE: Slower than R fft() when called from R. See note above.
+// Uses pre-created FFTW3 plans for thread-safe parallel execution.
 // [[Rcpp::export]]
 ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh,
                                 bool inverse = false) {
@@ -642,93 +641,131 @@ ComplexVector rcpp_fft3d_batch(ComplexVector arr, int n1, int n2, int n3, int dh
     if ((size_t)arr.size() != total) {
         stop("Array size mismatch: expected %d, got %d", (int)total, (int)arr.size());
     }
-    
+
     ComplexVector result(total);
     size_t slice_size = (size_t)n1 * n2 * n3;
-    
-    // Process each bandwidth slice in parallel
+
+#ifdef ARMA_USE_FFTW3
+    // FFTW3 path: pre-create plans outside parallel region (thread-safe execution)
+    int direction = inverse ? FFTW_BACKWARD : FFTW_FORWARD;
+    int max_n = std::max({n1, n2, n3});
+    std::vector<std::complex<double>> plan_buf(max_n);
+    ::fftw_complex* pb = reinterpret_cast< ::fftw_complex*>(plan_buf.data());
+
+    ::fftw_plan_s* plan_ax0 = ::fftw_plan_dft_1d(n1, pb, pb, direction, FFTW_ESTIMATE);
+    ::fftw_plan_s* plan_ax1 = ::fftw_plan_dft_1d(n2, pb, pb, direction, FFTW_ESTIMATE);
+    ::fftw_plan_s* plan_ax2 = ::fftw_plan_dft_1d(n3, pb, pb, direction, FFTW_ESTIMATE);
+
+    if (!plan_ax0 || !plan_ax1 || !plan_ax2) {
+        if (plan_ax0) ::fftw_destroy_plan(plan_ax0);
+        if (plan_ax1) ::fftw_destroy_plan(plan_ax1);
+        if (plan_ax2) ::fftw_destroy_plan(plan_ax2);
+        stop("FFTW3 plan creation failed for rcpp_fft3d_batch");
+    }
+
     #ifdef _OPENMP
     #pragma omp parallel for schedule(dynamic)
     #endif
     for (int h = 0; h < dh; ++h) {
         size_t offset = h * slice_size;
-        
-        // Working buffer for 3D FFT
         std::vector<std::complex<double>> buf(slice_size);
-        
-        // Copy slice to buffer
+        std::vector<std::complex<double>> tmp(max_n);
+        ::fftw_complex* tmp_ptr = reinterpret_cast< ::fftw_complex*>(tmp.data());
+
         for (size_t i = 0; i < slice_size; ++i) {
             buf[i] = std::complex<double>(arr[offset + i].r, arr[offset + i].i);
         }
-        
-        // Apply FFT along each dimension (like MATLAB: for ix=3:-1:1; m=fft(m,[],ix); end)
-        
-        // Axis 0 (n1): contiguous memory, easy
-        cx_vec tmp1d(n1);
+
+        // Axis 0 (n1): contiguous columns - in-place
         for (int k = 0; k < n3; ++k) {
             for (int j = 0; j < n2; ++j) {
-                // Extract column
-                for (int i = 0; i < n1; ++i) {
-                    tmp1d(i) = buf[i + j * n1 + k * n1 * n2];
-                }
-                // FFT (avoid ternary due to type mismatch)
-                cx_vec fft_result;
-                if (inverse) {
-                    fft_result = arma::ifft(tmp1d);
-                } else {
-                    fft_result = arma::fft(tmp1d);
-                }
-                // Store
-                for (int i = 0; i < n1; ++i) {
-                    buf[i + j * n1 + k * n1 * n2] = fft_result(i);
-                }
+                ::fftw_complex* col = reinterpret_cast< ::fftw_complex*>(
+                    &buf[j * n1 + k * (size_t)n1 * n2]);
+                ::fftw_execute_dft(plan_ax0, col, col);
             }
         }
-        
-        // Axis 1 (n2): stride = n1
-        cx_vec tmp2d(n2);
+
+        // Axis 1 (n2): stride = n1, gather/scatter
         for (int k = 0; k < n3; ++k) {
             for (int i = 0; i < n1; ++i) {
-                for (int j = 0; j < n2; ++j) {
-                    tmp2d(j) = buf[i + j * n1 + k * n1 * n2];
-                }
-                cx_vec fft_result;
-                if (inverse) {
-                    fft_result = arma::ifft(tmp2d);
-                } else {
-                    fft_result = arma::fft(tmp2d);
-                }
-                for (int j = 0; j < n2; ++j) {
-                    buf[i + j * n1 + k * n1 * n2] = fft_result(j);
-                }
+                for (int j = 0; j < n2; ++j)
+                    tmp[j] = buf[i + j * n1 + k * (size_t)n1 * n2];
+                ::fftw_execute_dft(plan_ax1, tmp_ptr, tmp_ptr);
+                for (int j = 0; j < n2; ++j)
+                    buf[i + j * n1 + k * (size_t)n1 * n2] = tmp[j];
             }
         }
-        
-        // Axis 2 (n3): stride = n1*n2
-        cx_vec tmp3d(n3);
+
+        // Axis 2 (n3): stride = n1*n2, gather/scatter
         for (int j = 0; j < n2; ++j) {
             for (int i = 0; i < n1; ++i) {
-                for (int k = 0; k < n3; ++k) {
-                    tmp3d(k) = buf[i + j * n1 + k * n1 * n2];
-                }
-                cx_vec fft_result;
-                if (inverse) {
-                    fft_result = arma::ifft(tmp3d);
-                } else {
-                    fft_result = arma::fft(tmp3d);
-                }
-                for (int k = 0; k < n3; ++k) {
-                    buf[i + j * n1 + k * n1 * n2] = fft_result(k);
-                }
+                for (int k = 0; k < n3; ++k)
+                    tmp[k] = buf[i + j * n1 + k * (size_t)n1 * n2];
+                ::fftw_execute_dft(plan_ax2, tmp_ptr, tmp_ptr);
+                for (int k = 0; k < n3; ++k)
+                    buf[i + j * n1 + k * (size_t)n1 * n2] = tmp[k];
             }
         }
-        
-        // Copy result back
+
+        // Normalize if inverse
+        if (inverse) {
+            double norm = 1.0 / (double)slice_size;
+            for (size_t i = 0; i < slice_size; ++i) buf[i] *= norm;
+        }
+
         for (size_t i = 0; i < slice_size; ++i) {
             result[offset + i] = Rcomplex{{buf[i].real(), buf[i].imag()}};
         }
     }
-    
+
+    ::fftw_destroy_plan(plan_ax0);
+    ::fftw_destroy_plan(plan_ax1);
+    ::fftw_destroy_plan(plan_ax2);
+
+#else
+    // Fallback: serialize arma::fft (plan creation not thread-safe)
+    for (int h = 0; h < dh; ++h) {
+        size_t offset = h * slice_size;
+        std::vector<std::complex<double>> buf(slice_size);
+        for (size_t i = 0; i < slice_size; ++i)
+            buf[i] = std::complex<double>(arr[offset + i].r, arr[offset + i].i);
+
+        cx_vec tmp1(n1);
+        for (int k = 0; k < n3; ++k) {
+            for (int j = 0; j < n2; ++j) {
+                for (int i = 0; i < n1; ++i)
+                    tmp1(i) = buf[i + j * n1 + k * (size_t)n1 * n2];
+                cx_vec r = inverse ? arma::ifft(tmp1) : arma::fft(tmp1);
+                for (int i = 0; i < n1; ++i)
+                    buf[i + j * n1 + k * (size_t)n1 * n2] = r(i);
+            }
+        }
+        cx_vec tmp2(n2);
+        for (int k = 0; k < n3; ++k) {
+            for (int i = 0; i < n1; ++i) {
+                for (int j = 0; j < n2; ++j)
+                    tmp2(j) = buf[i + j * n1 + k * (size_t)n1 * n2];
+                cx_vec r = inverse ? arma::ifft(tmp2) : arma::fft(tmp2);
+                for (int j = 0; j < n2; ++j)
+                    buf[i + j * n1 + k * (size_t)n1 * n2] = r(j);
+            }
+        }
+        cx_vec tmp3(n3);
+        for (int j = 0; j < n2; ++j) {
+            for (int i = 0; i < n1; ++i) {
+                for (int k = 0; k < n3; ++k)
+                    tmp3(k) = buf[i + j * n1 + k * (size_t)n1 * n2];
+                cx_vec r = inverse ? arma::ifft(tmp3) : arma::fft(tmp3);
+                for (int k = 0; k < n3; ++k)
+                    buf[i + j * n1 + k * (size_t)n1 * n2] = r(k);
+            }
+        }
+
+        for (size_t i = 0; i < slice_size; ++i)
+            result[offset + i] = Rcomplex{{buf[i].real(), buf[i].imag()}};
+    }
+#endif
+
     IntegerVector dims = IntegerVector::create(n1, n2, n3, dh);
     result.attr("dim") = dims;
     return result;
@@ -839,6 +876,151 @@ ComplexVector rcpp_broadcast_multiply_nd(ComplexVector kdf, ComplexVector y_ft,
     }
     
     return rcpp_broadcast_multiply(kdf, y_ft, L_spatial, dh, dy);
+}
+
+
+// =============================================================================
+// CRAMER SOLVER FOR 3D ORDER=1 LOCAL POLYNOMIAL REGRESSION
+// =============================================================================
+// Fused element-wise Cramer's rule for dx=3, order=1.
+// Eliminates 23 bmul() calls + array temporaries in R.
+// S: 10 real arrays (n_spatial each) — design matrix moments
+// T: 4 complex arrays (n_spatial * dh each) — weighted response moments
+// Returns: complex array (n_spatial * dh) — regression intercept estimate
+// [[Rcpp::export]]
+ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list,
+                                     int n_spatial, int dh,
+                                     double regularization) {
+    if (S_list.size() != 10) stop("S_list must have 10 elements for 3D order=1");
+    if (T_list.size() != 4) stop("T_list must have 4 elements for 3D order=1");
+
+    // Get raw pointers to S arrays (real, spatial-only)
+    NumericVector S1 = S_list[0], S2 = S_list[1], S3 = S_list[2];
+    NumericVector S4 = S_list[3], S5 = S_list[4], S6 = S_list[5];
+    NumericVector S7 = S_list[6], S8 = S_list[7], S9 = S_list[8];
+    NumericVector S10 = S_list[9];
+
+    if (S1.size() != n_spatial) stop("S array size mismatch: expected %d", n_spatial);
+
+    // Get raw pointers to T arrays (complex, spatial * dh)
+    ComplexVector T1 = T_list[0], T2 = T_list[1], T3 = T_list[2], T4 = T_list[3];
+    size_t t_size = (size_t)n_spatial * dh;
+    if ((size_t)T1.size() != t_size) stop("T array size mismatch: expected %d", (int)t_size);
+
+    // Output array
+    ComplexVector result(t_size);
+
+    double eps_reg = 2.220446e-16 * 1e6;  // .Machine$double.eps * 1e6
+
+    #ifdef _OPENMP
+    #pragma omp parallel for schedule(static)
+    #endif
+    for (int j = 0; j < dh; ++j) {
+        size_t offset = (size_t)j * n_spatial;
+        for (int i = 0; i < n_spatial; ++i) {
+            // S values (real, spatial-only)
+            double s1 = S1[i], s2 = S2[i], s3 = S3[i], s4 = S4[i], s5 = S5[i];
+            double s6 = S6[i], s7 = S7[i], s8 = S8[i], s9 = S9[i], s10 = S10[i];
+
+            // T values (complex, spatial + bandwidth)
+            size_t idx = i + offset;
+            std::complex<double> t1(T1[idx].r, T1[idx].i);
+            std::complex<double> t2(T2[idx].r, T2[idx].i);
+            std::complex<double> t3(T3[idx].r, T3[idx].i);
+            std::complex<double> t4(T4[idx].r, T4[idx].i);
+
+            // Precompute repeated S products
+            double s6sq = s6 * s6, s7sq = s7 * s7, s9sq = s9 * s9;
+
+            // Denominator (real, from S only)
+            double den = -s3*s3*s7sq - s4*s4*s6sq - s2*s2*s9sq
+                + s1*s5*s9sq + s1*s7sq*s8 + s1*s6sq*s10
+                + s4*s4*s5*s8 + s3*s3*s5*s10 + s2*s2*s8*s10
+                + 2.0*(s3*s4*s6*s7 - s2*s3*s6*s10 + s2*s3*s7*s9
+                + s2*s4*s6*s9 - s2*s4*s7*s8 - s3*s4*s5*s9
+                - s1*s6*s7*s9) - s1*s5*s8*s10;
+
+            // Regularize denominator
+            double abs_den = std::abs(den);
+            double sign_den = (den > 0.0) ? 1.0 : ((den < 0.0) ? -1.0 : 0.0);
+            double den_reg = std::max(abs_den, eps_reg) * sign_den;
+            if (abs_den < eps_reg) den_reg = eps_reg;
+
+            // Numerator (complex, involves T)
+            std::complex<double> num =
+                -s2*s9sq*t2 - s3*s7sq*t3 - s4*s6sq*t4
+                + s5*s9sq*t1 + s7sq*s8*t1 + s6sq*s10*t1
+                + s3*s6*s7*t4 + s4*s6*s7*t3
+                + s2*s6*s9*t4 - s2*s6*s10*t3
+                - s2*s7*s8*t4 + s2*s7*s9*t3
+                - s3*s5*s9*t4 + s3*s5*s10*t3
+                - s3*s6*s10*t2 + s3*s7*s9*t2
+                + s4*s5*s8*t4 - s4*s5*s9*t3
+                + s4*s6*s9*t2 - s4*s7*s8*t2
+                + s2*s8*s10*t2 - 2.0*s6*s7*s9*t1
+                - s5*s8*s10*t1;
+
+            std::complex<double> r = num / den_reg;
+            result[idx] = Rcomplex{{r.real(), r.imag()}};
+        }
+    }
+
+    // Set dimensions to match T layout
+    IntegerVector dims = T1.attr("dim");
+    if (dims.size() > 0) {
+        result.attr("dim") = dims;
+    }
+    return result;
+}
+
+// Cramer solver for 2D order=1 (same as 1D order=2): 6 S terms, 3 T terms
+// [[Rcpp::export]]
+ComplexVector rcpp_cramer_2d_order1(List S_list, List T_list,
+                                     int n_spatial, int dh,
+                                     double regularization) {
+    if (S_list.size() != 6) stop("S_list must have 6 elements for 2D order=1");
+    if (T_list.size() != 3) stop("T_list must have 3 elements for 2D order=1");
+
+    NumericVector S1 = S_list[0], S2 = S_list[1], S3 = S_list[2];
+    NumericVector S4 = S_list[3], S5 = S_list[4], S6 = S_list[5];
+    ComplexVector T1 = T_list[0], T2 = T_list[1], T3 = T_list[2];
+
+    size_t t_size = (size_t)n_spatial * dh;
+    ComplexVector result(t_size);
+    double eps_reg = 2.220446e-16 * 1e6;
+
+    #ifdef _OPENMP
+    #pragma omp parallel for schedule(static)
+    #endif
+    for (int j = 0; j < dh; ++j) {
+        size_t offset = (size_t)j * n_spatial;
+        for (int i = 0; i < n_spatial; ++i) {
+            double s1 = S1[i], s2 = S2[i], s3 = S3[i];
+            double s4 = S4[i], s5 = S5[i], s6 = S6[i];
+            size_t idx = i + offset;
+            std::complex<double> t1(T1[idx].r, T1[idx].i);
+            std::complex<double> t2(T2[idx].r, T2[idx].i);
+            std::complex<double> t3(T3[idx].r, T3[idx].i);
+
+            double s5sq = s5 * s5;
+            double den = s1*s5sq + s3*s3*s4 + s2*s2*s6
+                - 2.0*s2*s3*s5 - s1*s4*s6;
+            double abs_den = std::abs(den);
+            double sign_den = (den > 0.0) ? 1.0 : ((den < 0.0) ? -1.0 : 0.0);
+            double den_reg = std::max(abs_den, eps_reg) * sign_den;
+            if (abs_den < eps_reg) den_reg = eps_reg;
+
+            std::complex<double> num = s5sq*t1 - s2*s5*t3 + s2*s6*t2
+                + s3*s4*t3 - s3*s5*t2 - s4*s6*t1;
+
+            std::complex<double> r = num / den_reg;
+            result[idx] = Rcomplex{{r.real(), r.imag()}};
+        }
+    }
+
+    IntegerVector dims = T1.attr("dim");
+    if (dims.size() > 0) result.attr("dim") = dims;
+    return result;
 }
 
 

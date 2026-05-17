@@ -198,6 +198,36 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// rcpp_cramer_3d_order1
+ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list, int n_spatial, int dh, double regularization);
+RcppExport SEXP _fastlpr_rcpp_cramer_3d_order1(SEXP S_listSEXP, SEXP T_listSEXP, SEXP n_spatialSEXP, SEXP dhSEXP, SEXP regularizationSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type S_list(S_listSEXP);
+    Rcpp::traits::input_parameter< List >::type T_list(T_listSEXP);
+    Rcpp::traits::input_parameter< int >::type n_spatial(n_spatialSEXP);
+    Rcpp::traits::input_parameter< int >::type dh(dhSEXP);
+    Rcpp::traits::input_parameter< double >::type regularization(regularizationSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_cramer_3d_order1(S_list, T_list, n_spatial, dh, regularization));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rcpp_cramer_2d_order1
+ComplexVector rcpp_cramer_2d_order1(List S_list, List T_list, int n_spatial, int dh, double regularization);
+RcppExport SEXP _fastlpr_rcpp_cramer_2d_order1(SEXP S_listSEXP, SEXP T_listSEXP, SEXP n_spatialSEXP, SEXP dhSEXP, SEXP regularizationSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type S_list(S_listSEXP);
+    Rcpp::traits::input_parameter< List >::type T_list(T_listSEXP);
+    Rcpp::traits::input_parameter< int >::type n_spatial(n_spatialSEXP);
+    Rcpp::traits::input_parameter< int >::type dh(dhSEXP);
+    Rcpp::traits::input_parameter< double >::type regularization(regularizationSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_cramer_2d_order1(S_list, T_list, n_spatial, dh, regularization));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rcpp_extract_subarray
 NumericVector rcpp_extract_subarray(NumericVector arr, IntegerVector dims, IntegerVector starts, IntegerVector ends);
 RcppExport SEXP _fastlpr_rcpp_extract_subarray(SEXP arrSEXP, SEXP dimsSEXP, SEXP startsSEXP, SEXP endsSEXP) {
@@ -335,6 +365,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_fastlpr_rcpp_fft2d_batch", (DL_FUNC) &_fastlpr_rcpp_fft2d_batch, 5},
     {"_fastlpr_rcpp_broadcast_multiply", (DL_FUNC) &_fastlpr_rcpp_broadcast_multiply, 5},
     {"_fastlpr_rcpp_broadcast_multiply_nd", (DL_FUNC) &_fastlpr_rcpp_broadcast_multiply_nd, 5},
+    {"_fastlpr_rcpp_cramer_3d_order1", (DL_FUNC) &_fastlpr_rcpp_cramer_3d_order1, 5},
+    {"_fastlpr_rcpp_cramer_2d_order1", (DL_FUNC) &_fastlpr_rcpp_cramer_2d_order1, 5},
     {"_fastlpr_rcpp_extract_subarray", (DL_FUNC) &_fastlpr_rcpp_extract_subarray, 4},
     {"_fastlpr_rcpp_conv_nd_full", (DL_FUNC) &_fastlpr_rcpp_conv_nd_full, 8},
     {"_fastlpr_rcpp_gaussian_kernel_grid", (DL_FUNC) &_fastlpr_rcpp_gaussian_kernel_grid, 2},

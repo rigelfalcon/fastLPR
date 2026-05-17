@@ -468,14 +468,33 @@ complex_sign <- function(x) {
     return(numerator / denominator)
   }
 
-  # ORDER 1, 2D: Same formula as ORDER 2, 1D (3-parameter systems)
+  # ORDER 1, 2D: Same formula as ORDER 2, 1D (3-parameter systems) — Rcpp fast path
   if (order == 1 && dx == 2) {
-    s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]; s6 <- S[[6]]
-    t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]
     if (needs_broadcast) {
+      rcpp_fn <- get0("rcpp_cramer_2d_order1", envir = asNamespace("fastlpr"),
+                      inherits = FALSE)
+      if (is.function(rcpp_fn)) {
+        n_spatial <- length(S[[1]])
+        t_dims <- dim(T[[1]])
+        dh_val <- t_dims[length(t_dims)]
+        T_cx <- lapply(T, function(x) if (is.complex(x)) x else as.complex(x))
+        result <- tryCatch(
+          rcpp_fn(S, T_cx, as.integer(n_spatial), as.integer(dh_val), regularization),
+          error = function(e) NULL
+        )
+        if (!is.null(result)) {
+          dim(result) <- t_dims
+          return(result)
+        }
+      }
+      # R fallback
+      s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]; s6 <- S[[6]]
+      t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]
       numerator <- (bmul(s5^2, t1) - bmul(s2 * s5, t3) + bmul(s2 * s6, t2) +
                     bmul(s3 * s4, t3) - bmul(s3 * s5, t2) - bmul(s4 * s6, t1))
     } else {
+      s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]; s6 <- S[[6]]
+      t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]
       numerator <- (s5^2 * t1 - s2 * s5 * t3 + s2 * s6 * t2 + s3 * s4 * t3 - s3 * s5 * t2 - s4 * s6 * t1)
     }
     denominator <- (s1 * s5^2 + s3^2 * s4 + s2^2 * s6 - s2 * s3 * s5 * 2.0 - s1 * s4 * s6)
@@ -484,12 +503,29 @@ complex_sign <- function(x) {
     return(numerator / denominator)
   }
 
-  # ORDER 1, 3D: 10-parameter system
+  # ORDER 1, 3D: 10-parameter system — Rcpp fast path
   if (order == 1 && dx == 3) {
-    s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]
-    s6 <- S[[6]]; s7 <- S[[7]]; s8 <- S[[8]]; s9 <- S[[9]]; s10 <- S[[10]]
-    t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]; t4 <- T[[4]]
     if (needs_broadcast) {
+      rcpp_fn <- get0("rcpp_cramer_3d_order1", envir = asNamespace("fastlpr"),
+                      inherits = FALSE)
+      if (is.function(rcpp_fn)) {
+        n_spatial <- length(S[[1]])
+        t_dims <- dim(T[[1]])
+        dh_val <- t_dims[length(t_dims)]
+        T_cx <- lapply(T, function(x) if (is.complex(x)) x else as.complex(x))
+        result <- tryCatch(
+          rcpp_fn(S, T_cx, as.integer(n_spatial), as.integer(dh_val), regularization),
+          error = function(e) NULL
+        )
+        if (!is.null(result)) {
+          dim(result) <- t_dims
+          return(result)
+        }
+      }
+      # R fallback
+      s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]
+      s6 <- S[[6]]; s7 <- S[[7]]; s8 <- S[[8]]; s9 <- S[[9]]; s10 <- S[[10]]
+      t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]; t4 <- T[[4]]
       numerator <- (-bmul(s2 * s9^2, t2) - bmul(s3 * s7^2, t3) - bmul(s4 * s6^2, t4) +
                     bmul(s5 * s9^2, t1) + bmul(s7^2 * s8, t1) + bmul(s6^2 * s10, t1) +
                     bmul(s3 * s6 * s7, t4) + bmul(s4 * s6 * s7, t3) +
@@ -502,6 +538,9 @@ complex_sign <- function(x) {
                     bmul(s2 * s8 * s10, t2) - bmul(s6 * s7 * s9, t1) * 2.0 -
                     bmul(s5 * s8 * s10, t1))
     } else {
+      s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]; s4 <- S[[4]]; s5 <- S[[5]]
+      s6 <- S[[6]]; s7 <- S[[7]]; s8 <- S[[8]]; s9 <- S[[9]]; s10 <- S[[10]]
+      t1 <- T[[1]]; t2 <- T[[2]]; t3 <- T[[3]]; t4 <- T[[4]]
       numerator <- (-s2 * s9^2 * t2 - s3 * s7^2 * t3 - s4 * s6^2 * t4 + s5 * s9^2 * t1 +
                     s7^2 * s8 * t1 + s6^2 * s10 * t1 + s3 * s6 * s7 * t4 + s4 * s6 * s7 * t3 +
                     s2 * s6 * s9 * t4 - s2 * s6 * s10 * t3 - s2 * s7 * s8 * t4 + s2 * s7 * s9 * t3 -
