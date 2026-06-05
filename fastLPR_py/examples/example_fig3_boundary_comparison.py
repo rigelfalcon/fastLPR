@@ -6,8 +6,8 @@ This script reproduces Figure 3 from the fastLPR paper, demonstrating:
     * NW (Nadaraya-Watson, order 0 - local constant)
     * LL (Local Linear, order 1)
     * LQ (Local Quadratic, order 2)
-  - Oscillating test function with noise
-  - Comparison of boundary behavior
+  - Motorcycle crash test data (time vs head acceleration)
+  - Comparison of boundary behavior on real data
 
 The figure follows JSS publication standards with:
   - Fixed random seed for reproducibility
@@ -23,7 +23,6 @@ import matplotlib
 
 matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
-from scipy.special import j1  # Bessel function of the first kind
 import time
 import os
 import sys
@@ -40,29 +39,21 @@ print("=" * 80)
 print()
 
 ################################################################################
-# Generate Test Data (same as MATLAB version)
+# Load Real Data (MASS::mcycle - motorcycle crash test)
 ################################################################################
 
-print("Generating test data...")
+print("Loading mcycle data...")
 
-# Set random seed for reproducibility (same as MATLAB)
-np.random.seed(0)
+# Motorcycle crash test data (MASS::mcycle): a classic boundary-bias benchmark.
+# Column 0 = time in milliseconds after impact, column 1 = head acceleration in g.
+mcycle = np.loadtxt(os.path.join(os.path.dirname(__file__), "mcycle.txt"))
+x = mcycle[:, 0].reshape(-1, 1)
+y = mcycle[:, 1]
+n = len(y)
 
-# Sample size (same as MATLAB)
-n = 500
-
-# Generate scattered data in [0, 20] (same as MATLAB)
-x = np.random.rand(n, 1) * 20
-
-# True function: Bessel function of the first kind (same as MATLAB)
-y_true = j1(x.ravel())
-
-# Add Gaussian noise (same as MATLAB)
-y = y_true + 0.4 * np.std(y_true) * np.random.randn(len(y_true))
-
-print(f"  - Generated {n} samples")
+print(f"  - Loaded {n} samples")
 print(f"  - x range: [{x.min():.1f}, {x.max():.1f}]")
-print(f"  - Function: Bessel J1(x)")
+print(f"  - Data: MASS::mcycle (time vs head acceleration)")
 
 ################################################################################
 # Fit Three Regression Models
@@ -70,8 +61,8 @@ print(f"  - Function: Bessel J1(x)")
 
 print("\nFitting regression models...")
 
-# Create evaluation grid
-x_grid = np.linspace(0, 20, 500).reshape(-1, 1)
+# Create evaluation grid spanning the observed time range
+x_grid = np.linspace(x.min(), x.max(), 500).reshape(-1, 1)
 
 # Use automatic bandwidth selection with appropriate range
 # Generate bandwidth candidates (focus on larger range for smoother fits)
@@ -137,10 +128,11 @@ ax_main.plot(
 ax_main.plot(x_grid, y_ll, "r-", linewidth=3, label="LL regression", zorder=3)  # Red
 ax_main.plot(x_grid, y_lq, "b-", linewidth=3, label="LQ regression", zorder=4)  # Blue
 
-# Set axis limits (same as MATLAB)
-ax_main.set_xlim([0, 20])
-ax_main.set_ylim([-0.6, 1.0])
-ax_main.set_yticks(np.arange(-0.6, 1.1, 0.4))
+# Set axis limits to span the mcycle data
+ax_main.set_xlim([x.min(), x.max()])
+ax_main.set_ylim([-150, 100])
+ax_main.set_xlabel("Time (ms)", fontsize=16, fontweight="bold")
+ax_main.set_ylabel("Acceleration (g)", fontsize=16, fontweight="bold")
 ax_main.tick_params(labelsize=14)
 ax_main.grid(False)
 
@@ -185,7 +177,7 @@ print("=" * 80)
 print()
 
 print("Summary:")
-print(f"  - Data: {n} samples with oscillating function")
+print(f"  - Data: {n} samples (MASS::mcycle motorcycle crash test)")
 print(f"  - Bandwidths (auto-selected): NW={h_nw:.3f}, LL={h_ll:.3f}, LQ={h_lq:.3f}")
 print("  - Methods compared: NW (order 0), LL (order 1), LQ (order 2)")
 print(f"  - Figure saved to: {os.path.abspath(fig_dir)}")

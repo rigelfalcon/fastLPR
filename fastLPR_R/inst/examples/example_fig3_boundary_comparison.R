@@ -13,20 +13,19 @@ cat("\n", strrep("=", 80), "\n")
 cat("Figure 3: Boundary Comparison (NW vs LL vs LQ Regression)\n")
 cat(strrep("=", 80), "\n\n")
 
-# Set random seed (MATLAB uses rng(0), R uses set.seed(0))
-set.seed(0)
+# Load real data: MASS::mcycle motorcycle crash test
+# Column 1 = time (ms) after impact, column 2 = head acceleration (g).
+# A classic boundary-bias benchmark dataset.
+mcycle_path <- file.path(script_dir, "mcycle.txt")
+if (!file.exists(mcycle_path)) {
+  mcycle_path <- "fastLPR_R/inst/examples/mcycle.txt"
+}
+mcycle <- read.table(mcycle_path)
+x <- matrix(mcycle[, 1], ncol = 1)
+y <- matrix(mcycle[, 2], ncol = 1)
+n <- nrow(x)
 
-# Generate test data (matching MATLAB)
-n <- 500
-x <- matrix(runif(n, 0, 20), ncol = 1)
-
-# True function: Bessel J1 (matching MATLAB besselj(1,x))
-y_true <- besselJ(x, 1)
-
-# Add Gaussian noise (matching MATLAB: 0.4*std(y_true)*randn)
-y <- matrix(y_true + 0.4 * sd(y_true) * rnorm(n), ncol = 1)
-
-cat(sprintf("Generated %d samples\n", n))
+cat(sprintf("Loaded %d samples (MASS::mcycle)\n", n))
 cat(sprintf("X range: [%.1f, %.1f]\n", min(x), max(x)))
 
 # Create bandwidth list
@@ -52,8 +51,8 @@ opt$order <- 2
 regs2 <- cv_fastlpr(x, y, hlist, opt)
 cat(sprintf("Selected bandwidth: %.4f\n", regs2$gcv_yhat$h1se))
 
-# Create evaluation grid
-x_grid <- seq(0, 20, length.out = 500)
+# Create evaluation grid spanning the observed time range
+x_grid <- seq(min(x), max(x), length.out = 500)
 y_grid_0 <- regs0$fpp_yhat(matrix(x_grid, ncol = 1))
 y_grid_1 <- regs1$fpp_yhat(matrix(x_grid, ncol = 1))
 y_grid_2 <- regs2$fpp_yhat(matrix(x_grid, ncol = 1))
@@ -66,9 +65,9 @@ png("fastLPR_R/fig/reproduced/fig3_boundary_comparison_r.png",
 par(mar = c(4.5, 4.5, 3, 1))
 
 # Plot all data and 3 regression curves
-plot(x, y, pch = 20, cex = 0.4, col = "black",
-     xlim = c(0, 20), ylim = c(-0.6, 1.0),
-     xlab = "x", ylab = "y",
+plot(x, y, pch = 20, cex = 0.7, col = "black",
+     xlim = c(min(x), max(x)), ylim = c(-150, 100),
+     xlab = "Time (ms)", ylab = "Acceleration (g)",
      main = "Boundary Effects: Local Polynomial Orders 0, 1, 2",
      cex.main = 1.3, cex.lab = 1.2, font.main = 1)
 

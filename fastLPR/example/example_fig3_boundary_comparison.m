@@ -7,8 +7,8 @@
 %     * NW (Nadaraya-Watson, order 0 - local constant)
 %     * LL (Local Linear, order 1)
 %     * LQ (Local Quadratic, order 2)
-%   - Two inset zoom boxes showing detailed comparison at boundaries
-%   - Oscillating test function with noise
+%   - Comparison of boundary behavior on real data
+%   - Motorcycle crash test data (time vs head acceleration)
 %
 % The figure follows JSS publication standards with:
 %   - Fixed random seed for reproducibility
@@ -30,30 +30,22 @@ fprintf('Figure 3: Boundary Comparison (NW vs LL vs LQ Regression)\n');
 fprintf('================================================================================\n\n');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Generate Test Data (same as demo_basic_script.m)
+% Load Real Data (MASS::mcycle - motorcycle crash test)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('Generating test data...\n');
+fprintf('Loading mcycle data...\n');
 
-% Set random seed for reproducibility (same as demo_basic_script.m)
-rng(0);
+% Motorcycle crash test data (MASS::mcycle): a classic boundary-bias
+% benchmark. Column 1 = time in milliseconds after impact, column 2 = head
+% acceleration in g.
+mcycle = load(fullfile(fileparts(mfilename('fullpath')), 'mcycle.txt'));
+x = mcycle(:, 1);
+y = mcycle(:, 2);
+n = numel(y);
 
-% Sample size (match demo_basic_script.m)
-n = 500;
-
-% Generate scattered data in [0, 20] (same as demo_basic_script.m)
-x = rand(n, 1) * 20;
-
-% True function: Bessel function of the first kind (same as demo_basic_script.m)
-fun = @(x) besselj(1, x);
-y_true = fun(x);
-
-% Add Gaussian noise (same as demo_basic_script.m)
-y = y_true + 0.4*std(y_true) .* randn(size(y_true));
-
-fprintf('  - Generated %d samples\n', n);
+fprintf('  - Loaded %d samples\n', n);
 fprintf('  - x range: [%.1f, %.1f]\n', min(x), max(x));
-fprintf('  - Function: Bessel J1(x)\n');
+fprintf('  - Data: MASS::mcycle (time vs head acceleration)\n');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Fit Three Regression Models
@@ -61,8 +53,8 @@ fprintf('  - Function: Bessel J1(x)\n');
 
 fprintf('\nFitting regression models...\n');
 
-% Create evaluation grid
-x_grid = linspace(0, 20, 500)';
+% Create evaluation grid spanning the observed time range
+x_grid = linspace(min(x), max(x), 500)';
 
 % Use automatic bandwidth selection with appropriate range
 % Generate bandwidth candidates (focus on larger range for smoother fits)
@@ -132,15 +124,14 @@ plot(x_grid, y_ll, '--', 'Color', [0.8, 0, 0], 'LineWidth', 3, 'DisplayName', 'L
 % LQ: Dash-dot blue line
 plot(x_grid, y_lq, '-.', 'Color', [0, 0, 0.8], 'LineWidth', 3, 'DisplayName', 'LQ (order 2)');
 
-% Set axis limits (same as demo_basic_script.m)
-xlim([0, 20]);
-ylim([-0.6, 1.0]);
+% Set axis limits to span the mcycle data
+xlim([min(x), max(x)]);
+ylim([-150, 100]);
 set(gca, 'FontSize', 14);
-set(gca, 'YTick', [-0.6:0.4:1]);
 
-% Add axis labels (CRITICAL FIX - these were missing!)
-xlabel('x', 'FontSize', 16, 'FontWeight', 'bold');
-ylabel('y', 'FontSize', 16, 'FontWeight', 'bold');
+% Add axis labels
+xlabel('Time (ms)', 'FontSize', 16, 'FontWeight', 'bold');
+ylabel('Acceleration (g)', 'FontSize', 16, 'FontWeight', 'bold');
 
 % Add legend at top
 legend('Location', 'north', 'FontSize', 14, 'Box', 'on', 'Color', 'w', 'Orientation', 'horizontal');
@@ -177,7 +168,7 @@ fprintf('Figure 3 Generation Complete!\n');
 fprintf('================================================================================\n\n');
 
 fprintf('Summary:\n');
-fprintf('  - Data: %d samples with oscillating function\n', n);
+fprintf('  - Data: %d samples (MASS::mcycle motorcycle crash test)\n', n);
 fprintf('  - Bandwidths (auto-selected): NW=%.3f, LL=%.3f, LQ=%.3f\n', h_nw, h_ll, h_lq);
 fprintf('  - Methods compared: NW (order 0), LL (order 1), LQ (order 2)\n');
 fprintf('  - Figure saved to: %s\n', figDir);
