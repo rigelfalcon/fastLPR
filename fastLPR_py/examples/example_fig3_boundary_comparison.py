@@ -10,7 +10,7 @@ This script reproduces Figure 3 from the fastLPR paper, demonstrating:
   - Comparison of boundary behavior on real data
 
 The figure follows JSS publication standards with:
-  - Fixed random seed for reproducibility
+  - Real benchmark dataset (MASS::mcycle)
   - Consistent styling (fonts, colors, sizes)
   - 300 DPI resolution for publication
   - Self-contained code (no external dependencies except fastLPR)

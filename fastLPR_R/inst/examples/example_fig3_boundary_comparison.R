@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Figure 3: Boundary Comparison (NW vs LL vs LQ Regression)
-# UNIFIED VERSION - Uses R native RNG (equivalent to MATLAB rng(0))
+# UNIFIED VERSION - Uses MASS::mcycle motorcycle crash test data
 
 # Auto-detect working directory
 script_dir <- tryCatch({ dirname(sys.frame(1)$ofile) }, error = function(e) ".")
