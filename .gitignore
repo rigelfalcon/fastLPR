@@ -64,6 +64,7 @@ Thumbs.db
 *.eps
 *.zip
 *.tar.gz
+!fastLPR_matlab_v1.0.0.tar.gz
 *.7z
 *.rar
 /backup
