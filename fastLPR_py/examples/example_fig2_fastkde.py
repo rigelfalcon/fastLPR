@@ -48,27 +48,16 @@ print()
 
 print("Generating Panel (a) and (d): 1D KDE...")
 
-# Set random seed for reproducibility (matches paper)
-np.random.seed(42)
+# Load Old Faithful geyser data (R built-in 'faithful', n = 272).
+# Columns: 0 = eruption duration (min), 1 = waiting time (min).
+# Panel (a) uses eruption durations, a classic bimodal real dataset.
+faithful = np.loadtxt(os.path.join(os.path.dirname(__file__), "faithful.txt"))
+x = faithful[:, [0]]  # Eruption duration (min), shape (n, 1)
 
-# Generate bimodal data: two Gaussian modes
-# Check for quick test mode (reduced samples for faster testing)
-quick_test = os.environ.get("FASTLPR_QUICK_TEST", "0") == "1"
-if quick_test:
-    n1 = 500  # Reduced for quick testing (50% of original)
-    n2 = 200
-    print("  [QUICK TEST MODE: Using 50% sample sizes for faster testing]")
-else:
-    n1 = 1000  # First mode sample size
-    n2 = 400  # Second mode sample size
-x1 = np.random.randn(n1, 1) * 0.5  # First mode at 0, std=0.5
-x2 = np.random.randn(n2, 1) * 0.7 + 3  # Second mode at 3, std=0.7
-x = np.vstack([x1, x2])
+print(f"  - Loaded {len(x)} Old Faithful eruption-duration samples")
 
-print(f"  - Generated {len(x)} samples from bimodal distribution")
-
-# Create bandwidth list (log-spaced from 0.01 to 2)
-hlist = get_hlist(20, np.array([[0.01, 2]]))  # Default is logspace
+# Create bandwidth list (log-spaced) for the eruption-duration scale (~1.6-5.1 min)
+hlist = get_hlist(20, np.array([[0.05, 2]]))  # Default is logspace
 print(f"  - Testing {len(hlist)} bandwidths")
 
 # Compute KDE with automatic bandwidth selection via LCV
@@ -86,33 +75,23 @@ print(f"  - Selected bandwidth: h = {kde.h[0]:.4f}")
 
 print("\nGenerating Panel (b) and (e): 2D KDE...")
 
-# Set random seed for reproducibility
-np.random.seed(44)
+# Old Faithful 2D: eruption duration vs waiting time (both columns).
+x2d = faithful[:, [0, 1]]  # [eruptions (min), waiting (min)]
 
-# Generate 2D data with two clusters
-if quick_test:
-    n_cluster = 500  # Reduced for quick testing (50% of original)
-else:
-    n_cluster = 1000
-x2d_1 = np.random.randn(n_cluster, 2) * 0.5  # First cluster at origin
-x2d_2 = np.random.randn(n_cluster, 2) * 0.7 + np.array(
-    [[2, 2]]
-)  # Second cluster at (2,2)
-x2d = np.vstack([x2d_1, x2d_2])
+print(f"  - Loaded {x2d.shape[0]} Old Faithful 2D samples")
 
-print(f"  - Generated {x2d.shape[0]} samples from 2D bimodal distribution")
-
-# Create 2D bandwidth list (log-spaced grid)
+# Create 2D bandwidth list (log-spaced grid) matched to each axis scale:
+#   eruptions ~ [1.6, 5.1] min, waiting ~ [43, 96] min
 hlist2d = get_hlist(
-    np.array([20, 20]), np.array([[0.1, 2], [0.1, 2]])
+    np.array([20, 20]), np.array([[0.05, 1.5], [1, 20]])
 )  # Default is logspace
 print(f"  - Testing {hlist2d.shape[0]} bandwidth combinations")
 
 # Compute 2D KDE with automatic bandwidth selection
 opt2d = {
     "verbose": False,
-    "N": np.array([51, 51]),  # Grid size (odd keeps origin centered)
-    "xrange": np.array([[-2, 4], [-2, 4]]),  # Evaluation range
+    "N": np.array([51, 51]),  # Grid size
+    "xrange": np.array([[1, 6], [35, 100]]),  # Evaluation range (eruptions, waiting)
 }
 start_time = time.time()
 kde2d = cv_fastkde(x2d, hlist2d, opt2d)
@@ -133,6 +112,7 @@ print("\nGenerating Panel (c) and (f): 3D KDE...")
 np.random.seed(45)
 
 # Generate 3D data with three clusters
+quick_test = os.environ.get("FASTLPR_QUICK_TEST", "0") == "1"
 if quick_test:
     n_cluster = 400  # Reduced for quick testing (50% of original)
 else:
@@ -221,7 +201,7 @@ ax1.plot(
     label=f"h={kde.h[0]:.3f} (selected)",
 )
 
-ax1.set_xlabel("x", fontsize=14)
+ax1.set_xlabel("Eruption duration (min)", fontsize=14)
 ax1.set_ylabel("Density", fontsize=14)
 ax1.set_title("(a) 1D KDE with Bandwidth Comparison", fontsize=16, fontweight="bold")
 ax1.legend(loc="upper right", fontsize=11)
@@ -254,11 +234,11 @@ ax2.contour(
 # Overlay data points (small black dots)
 ax2.plot(x2d[:, 0], x2d[:, 1], "k.", markersize=3)
 
-ax2.set_xlabel("$x_1$", fontsize=14)
-ax2.set_ylabel("$x_2$", fontsize=14)
+ax2.set_xlabel("Eruption duration (min)", fontsize=14)
+ax2.set_ylabel("Waiting time (min)", fontsize=14)
 ax2.set_title("(b) 2D KDE Density Contours", fontsize=16, fontweight="bold")
 ax2.tick_params(labelsize=12)
-ax2.set_aspect("equal", adjustable="box")
+ax2.set_aspect("auto", adjustable="box")
 
 ################################################################################
 # Panel (c): 3D KDE (Volume Rendering)

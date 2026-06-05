@@ -70,20 +70,16 @@ cat("\n")
 
 cat("Generating Panel (a) and (c): 1D KDE...\n")
 
-# Set random seed for reproducibility (matches paper)
-set.seed(42)
+# Load Old Faithful geyser data (R built-in 'faithful', n = 272).
+# Columns: 1 = eruption duration (min), 2 = waiting time (min).
+# Panel (a) uses eruption durations, a classic bimodal real dataset.
+faithful_data <- read.table(file.path(script_dir, "faithful.txt"))
+x <- as.matrix(faithful_data[, 1])                         # Eruption duration (min)
 
-# Generate bimodal data: two Gaussian modes
-n1 <- 1000  # First mode sample size
-n2 <- 400   # Second mode sample size
-x1 <- matrix(rnorm(n1, mean = 0, sd = 0.5), ncol = 1)      # First mode at 0, std=0.5
-x2 <- matrix(rnorm(n2, mean = 3, sd = 0.7), ncol = 1)      # Second mode at 3, std=0.7
-x <- rbind(x1, x2)
+cat(sprintf("  - Loaded %d Old Faithful eruption-duration samples\n", nrow(x)))
 
-cat(sprintf("  - Generated %d samples from bimodal distribution\n", nrow(x)))
-
-# Create bandwidth list (log-spaced from 0.01 to 2)
-hlist <- get_hlist(20, c(0.01, 2))  # Log-spaced
+# Create bandwidth list (log-spaced) for the eruption-duration scale (~1.6-5.1 min)
+hlist <- get_hlist(20, c(0.05, 2))  # Log-spaced
 cat(sprintf("  - Testing %d bandwidths\n", length(hlist)))
 
 # Compute KDE with automatic bandwidth selection via LCV
@@ -100,27 +96,21 @@ cat(sprintf("  - Selected bandwidth: h = %.4f\n", kde$h))
 
 cat("\nGenerating Panel (b) and (d): 2D KDE...\n")
 
-# Set random seed for reproducibility
-set.seed(44)
+# Old Faithful 2D: eruption duration vs waiting time (both columns).
+x2d <- as.matrix(faithful_data[, c(1, 2)])  # [eruptions (min), waiting (min)]
 
-# Generate 2D data with two clusters
-n_cluster <- 1000
-x2d_1 <- matrix(rnorm(n_cluster * 2, sd = 0.5), ncol = 2)  # First cluster at origin
-x2d_2 <- matrix(rnorm(n_cluster * 2, sd = 0.7), ncol = 2) + matrix(rep(c(2, 2), n_cluster), ncol = 2, byrow = TRUE)  # Second cluster at (2,2)
-x2d <- rbind(x2d_1, x2d_2)
+cat(sprintf("  - Loaded %d Old Faithful 2D samples\n", nrow(x2d)))
 
-cat(sprintf("  - Generated %d samples from 2D bimodal distribution\n", nrow(x2d)))
-
-# Create 2D bandwidth list (log-spaced grid)
-# Use 20x20 grid like MATLAB
-hlist2d <- get_hlist(c(20, 20), matrix(c(0.1, 2, 0.1, 2), nrow = 2, byrow = TRUE))
+# Create 2D bandwidth list (log-spaced grid) matched to each axis scale:
+#   eruptions ~ [1.6, 5.1] min, waiting ~ [43, 96] min
+hlist2d <- get_hlist(c(20, 20), matrix(c(0.05, 1.5, 1, 20), nrow = 2, byrow = TRUE))
 cat(sprintf("  - Testing %d bandwidth combinations\n", nrow(hlist2d)))
 
 # Compute 2D KDE with automatic bandwidth selection
 opt2d <- list(
   verbose = FALSE,
-  N = c(51, 51),  # Grid size (odd keeps origin centered)
-  xrange = matrix(c(-2, 4, -2, 4), nrow = 2, byrow = TRUE)  # Evaluation range
+  N = c(51, 51),  # Grid size
+  xrange = matrix(c(1, 6, 35, 100), nrow = 2, byrow = TRUE)  # Evaluation range (eruptions, waiting)
 )
 start_time <- Sys.time()
 kde2d <- cv_fastkde(x2d, hlist2d, opt2d)
@@ -187,7 +177,7 @@ x_grid <- seq(min(x) - 1, max(x) + 1, length.out = 200)
 
 # Plot histogram (light gray, semi-transparent)
 hist(x, breaks = 30, freq = FALSE, col = rgb(0.7, 0.7, 0.7, 0.5),
-     border = "black", main = "", xlab = "x", ylab = "Density",
+     border = "black", main = "", xlab = "Eruption duration (min)", ylab = "Density",
      xlim = range(x_grid), cex.lab = 1.3, cex.axis = 1.1)
 
 # Plot 5 different bandwidths to show effect of bandwidth selection
@@ -274,8 +264,8 @@ fhat_2d <- matrix(kde2d$fhat, nrow = n1, ncol = n2)
 # Create image plot with contours (compatible with multi-panel layout)
 image(x1_grid, x2_grid, fhat_2d,
       col = parula(100),
-      xlab = expression(x[1]),
-      ylab = expression(x[2]),
+      xlab = "Eruption duration (min)",
+      ylab = "Waiting time (min)",
       main = "(b) 2D KDE Density Contours",
       font.main = 2, cex.main = 1.4, cex.lab = 1.3, cex.axis = 1.1)
 

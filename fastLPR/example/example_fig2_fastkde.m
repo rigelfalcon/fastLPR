@@ -37,20 +37,16 @@ fprintf('=======================================================================
 
 fprintf('Generating Panel (a) and (b): 1D KDE...\n');
 
-% Set random seed for reproducibility (matches paper)
-rng(42);
+% Load Old Faithful geyser data (R built-in 'faithful', n = 272).
+% Columns: 1 = eruption duration (min), 2 = waiting time (min).
+% Panel (a) uses eruption durations, a classic bimodal real dataset.
+faithful = load(fullfile(fileparts(mfilename('fullpath')), 'faithful.txt'));
+x = faithful(:, 1);                   % Eruption duration (min)
 
-% Generate bimodal data: two Gaussian modes
-n1 = 1000;  % First mode sample size
-n2 = 400;   % Second mode sample size
-x1 = randn(n1, 1) * 0.5;              % First mode at 0, std=0.5
-x2 = randn(n2, 1) * 0.7 + 3;          % Second mode at 3, std=0.7
-x = [x1; x2];
+fprintf('  - Loaded %d Old Faithful eruption-duration samples\n', length(x));
 
-fprintf('  - Generated %d samples from bimodal distribution\n', length(x));
-
-% Create bandwidth list (log-spaced from 0.01 to 2)
-hlist = get_hlist(20, [0.01, 2], @logspace);
+% Create bandwidth list (log-spaced) for the eruption-duration scale (~1.6-5.1 min)
+hlist = get_hlist(20, [0.05, 2], @logspace);
 fprintf('  - Testing %d bandwidths\n', length(hlist));
 
 % Compute KDE with automatic bandwidth selection via LCV
@@ -68,25 +64,20 @@ fprintf('  - Selected bandwidth: h = %.4f\n', kde.h);
 
 fprintf('\nGenerating Panel (c) and (d): 2D KDE...\n');
 
-% Set random seed for reproducibility
-rng(44);
+% Old Faithful 2D: eruption duration vs waiting time (both columns).
+x2d = faithful(:, [1, 2]);            % [eruptions (min), waiting (min)]
 
-% Generate 2D data with two clusters
-n_cluster = 1000;
-x2d_1 = randn(n_cluster, 2) * 0.5;                              % First cluster at origin
-x2d_2 = randn(n_cluster, 2) * 0.7 + repmat([2, 2], n_cluster, 1);  % Second cluster at (2,2)
-x2d = [x2d_1; x2d_2];
+fprintf('  - Loaded %d Old Faithful 2D samples\n', size(x2d, 1));
 
-fprintf('  - Generated %d samples from 2D bimodal distribution\n', size(x2d, 1));
-
-% Create 2D bandwidth list (log-spaced grid)
-hlist2d = get_hlist([20, 20], [0.1, 2; 0.1, 2], @logspace);
+% Create 2D bandwidth list (log-spaced grid) matched to each axis scale:
+%   eruptions ~ [1.6, 5.1] min, waiting ~ [43, 96] min
+hlist2d = get_hlist([20, 20], [0.05, 1.5; 1, 20], @logspace);
 fprintf('  - Testing %d bandwidth combinations\n', size(hlist2d, 1));
 
 % Compute 2D KDE with automatic bandwidth selection
 opt2d.verbose = false;
-opt2d.N = [51, 51];                   % Grid size (odd keeps origin centered)
-opt2d.xrange = [-2, 4; -2, 4];        % Evaluation range
+opt2d.N = [51, 51];                   % Grid size
+opt2d.xrange = [1, 6; 35, 100];       % Evaluation range (eruptions, waiting)
 tic;
 kde2d = cv_fastkde(x2d, hlist2d, opt2d);
 elapsed2d = toc;
@@ -172,7 +163,7 @@ end
 plot(kde.xlist{1}, kde.fhat, 'r-', 'LineWidth', 3, ...
      'DisplayName', sprintf('h=%.3f (selected)', kde.h));
 
-xlabel('x', 'FontSize', 14);
+xlabel('Eruption duration (min)', 'FontSize', 14);
 ylabel('Density', 'FontSize', 14);
 title('(a) 1D KDE with Bandwidth Comparison', 'FontSize', 16, 'FontWeight', 'bold');
 legend('Location', 'northeast', 'FontSize', 11);
@@ -193,11 +184,11 @@ colorbar;
 % Overlay data points (small black dots)
 plot(x2d(:,1), x2d(:,2), 'k.', 'MarkerSize', 3);
 
-xlabel('x_1', 'FontSize', 14);
-ylabel('x_2', 'FontSize', 14);
+xlabel('Eruption duration (min)', 'FontSize', 14);
+ylabel('Waiting time (min)', 'FontSize', 14);
 title('(b) 2D KDE Density Contours', 'FontSize', 16, 'FontWeight', 'bold');
 set(gca, 'FontSize', 12);
-axis equal tight;
+axis tight;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Panel (c): 3D KDE (Volume Rendering)
