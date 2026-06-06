@@ -112,11 +112,11 @@ fastLPR_R/
 ├── src/                        # C++ acceleration (Rcpp/RcppArmadillo)
 ├── inst/
 │   ├── examples/              # JSS paper figure reproduction scripts
-│   │   ├── example_fig2_fastkde.R
-│   │   ├── example_fig3_boundary_comparison.R
-│   │   ├── example_fig4_complex.R
-│   │   ├── example_fig5_heteroscedasticity.R
-│   │   ├── example_fig6_applications.R
+│   │   ├── example_kde.R
+│   │   ├── example_boundary.R
+│   │   ├── example_complex.R
+│   │   ├── example_hetero.R
+│   │   ├── example_qeeg.R
 │   │   └── reproduce_all_figures.R
 │   └── benchmarks/            # Performance comparison scripts
 │       ├── benchmark_tab4_kde_comparison.R
@@ -143,16 +143,16 @@ Reproduce all figures from the JSS paper:
 source(system.file("examples", "reproduce_all_figures.R", package = "fastlpr"))
 
 # Or run individual figures
-source(system.file("examples", "example_fig2_fastkde.R", package = "fastlpr"))
+source(system.file("examples", "example_kde.R", package = "fastlpr"))
 ```
 
 | Figure | Description | Script |
 |--------|-------------|--------|
-| Fig 2 | KDE (1D/2D/3D) | `example_fig2_fastkde.R` |
-| Fig 3 | Boundary comparison (NW/LL/LQ) | `example_fig3_boundary_comparison.R` |
-| Fig 4 | Complex-valued regression | `example_fig4_complex.R` |
-| Fig 5 | Heteroscedastic variance | `example_fig5_heteroscedasticity.R` |
-| Fig 6 | Applications (qEEG/MRI) | `example_fig6_applications.R` |
+| Fig 2 | KDE (1D/2D/3D) | `example_kde.R` |
+| Fig 3 | Boundary comparison (NW/LL/LQ) | `example_boundary.R` |
+| Fig 4 | Complex-valued regression | `example_complex.R` |
+| Fig 5 | Heteroscedastic variance | `example_hetero.R` |
+| Fig 6 | Applications (qEEG/MRI) | `example_qeeg.R` |
 
 ## Benchmarks
 

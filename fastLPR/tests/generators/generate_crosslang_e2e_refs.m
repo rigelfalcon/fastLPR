@@ -39,16 +39,16 @@ fprintf('=======================================================================
 rng(42); % Fixed seed for reproducibility
 
 %% Test Configuration - Sample sizes match JSS paper examples
-% KDE sample sizes (from example_fig2_fastkde.m)
+% KDE sample sizes (from example_kde.m)
 n_kde_1d = 1400;   % fig2: 1000+400 bimodal
 n_kde_2d = 2000;   % fig2: 2x1000 clusters
 n_kde_3d = 2000;   % fig2
 
-% LPR sample sizes (from example_fig3, fig5)
+% LPR sample sizes (from example_boundary, example_hetero)
 n_lpr_1d = 500;    % fig3: boundary comparison
 n_lpr_2d = 1200;   % fig5: heteroscedastic 2D
 
-% Complex and heteroscedastic (from example_fig4, fig5)
+% Complex and heteroscedastic (from example_complex, example_hetero)
 n_complex = 10000; % fig4: 100x100 grid
 n_hetero = 10000;  % fig5: 1D heteroscedastic
 
@@ -314,7 +314,7 @@ fprintf('  Saved: ref_complex.mat (elapsed: %.3f sec)\n\n', elapsed);
 
 %% ============================================================================
 %% TEST 9: Heteroscedastic 1D (mean + variance, order=1)
-%% Following example_fig5_heteroscedasticity.m pattern: two-step estimation
+%% Following example_hetero.m pattern: two-step estimation
 %% ============================================================================
 fprintf('>>> TEST 9: Heteroscedastic 1D (mean + variance, order=1) <<<\n');
 
@@ -367,7 +367,7 @@ fprintf('  Saved: ref_hetero_1d.mat (elapsed: %.3f sec)\n\n', elapsed);
 
 %% ============================================================================
 %% TEST 10: Heteroscedastic 2D (mean + variance, order=1)
-%% Following example_fig5_heteroscedasticity.m pattern
+%% Following example_hetero.m pattern
 %% ============================================================================
 fprintf('>>> TEST 10: Heteroscedastic 2D (mean + variance, order=1) <<<\n');
 

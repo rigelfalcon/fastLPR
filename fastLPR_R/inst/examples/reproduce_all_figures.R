@@ -71,27 +71,27 @@ results[[2]] <- run_example(
 
 results[[3]] <- run_example(
   "Figure 2: FastKDE (1D and 2D)",
-  "fastLPR_R/examples/example_fig2_fastkde.R"
+  "fastLPR_R/examples/example_kde.R"
 )
 
 results[[4]] <- run_example(
   "Figure 3: Boundary Comparison (Orders 0, 1, 2)",
-  "fastLPR_R/examples/example_fig3_boundary_comparison.R"
+  "fastLPR_R/examples/example_boundary.R"
 )
 
 results[[5]] <- run_example(
   "Figure 4: Complex-Valued Regression",
-  "fastLPR_R/examples/example_fig4_complex.R"
+  "fastLPR_R/examples/example_complex.R"
 )
 
 results[[6]] <- run_example(
   "Figure 5: Heteroscedasticity (1D and 2D)",
-  "fastLPR_R/examples/example_fig5_heteroscedasticity.R"
+  "fastLPR_R/examples/example_hetero.R"
 )
 
 results[[7]] <- run_example(
   "Figure 6: Real Applications (qEEG and MRI)",
-  "fastLPR_R/examples/example_fig6_applications.R"
+  "fastLPR_R/examples/example_qeeg.R"
 )
 
 # Summary

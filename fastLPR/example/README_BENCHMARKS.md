@@ -4,7 +4,7 @@ This directory contains reproducible benchmark scripts for JSS manuscript tables
 
 ## File Naming Convention
 
-- **Figures:** `example_fig<N>_<description>.m` (e.g., `example_fig2_fastkde.m`)
+- **Figures:** `example_<topic>.m` (e.g., `example_kde.m`)
 - **Tables:** `benchmark_tab<N>_<description>.m` (e.g., `benchmark_tab5_complete.m`)
 
 Where `<N>` is the table/figure number as it appears in the manuscript.
@@ -13,11 +13,11 @@ Where `<N>` is the table/figure number as it appears in the manuscript.
 
 | Figure # | Script | Description |
 |----------|--------|-------------|
-| **Figure 2** | `example_fig2_fastkde.m` | 1D/2D/3D KDE with bandwidth selection |
-| **Figure 3** | `example_fig3_boundary_comparison.m` | Boundary bias comparison |
-| **Figure 4** | `example_fig4_complex.m` | Complex-valued regression |
-| **Figure 5** | `example_fig5_heteroscedasticity.m` | Heteroscedastic regression with CI |
-| **Figure 6** | `example_fig6_applications.m` | Real-world applications (qEEG, MRI) |
+| **Figure 2** | `example_kde.m` | 1D/2D/3D KDE with bandwidth selection |
+| **Figure 3** | `example_boundary.m` | Boundary bias comparison |
+| **Figure 4** | `example_complex.m` | Complex-valued regression |
+| **Figure 5** | `example_hetero.m` | Heteroscedastic regression with CI |
+| **Figure 6** | `example_qeeg.m` | Real-world applications (qEEG, MRI) |
 | **All** | `reproduce_all_figures.m` | Master script to generate all figures |
 
 ## Manuscript Tables

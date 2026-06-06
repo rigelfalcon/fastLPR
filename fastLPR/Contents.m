@@ -22,11 +22,11 @@
 %   fastlpr_setup           - Add toolbox to MATLAB path
 %
 % Examples (Reproduce JSS Paper Figures)
-%   example/example_fig2_fastkde.m              - 1D kernel density estimation
-%   example/example_fig3_boundary_comparison.m  - Boundary effect comparison
-%   example/example_fig4_complex.m              - Complex-valued regression
-%   example/example_fig5_heteroscedasticity.m   - Heteroscedastic regression
-%   example/example_fig6_applications.m         - Real-world qEEG application
+%   example/example_kde.m              - 1D kernel density estimation
+%   example/example_boundary.m  - Boundary effect comparison
+%   example/example_complex.m              - Complex-valued regression
+%   example/example_hetero.m   - Heteroscedastic regression
+%   example/example_qeeg.m         - Real-world qEEG application
 %   example/reproduce_all_figures.m             - Generate all JSS figures
 %
 % Tests

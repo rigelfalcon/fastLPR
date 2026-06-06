@@ -74,11 +74,11 @@ reproduce_all_figures  % Generates the paper figures
 ```
 
 Individual examples:
-- `example_fig2_fastkde.m` - 1D kernel density estimation
-- `example_fig3_boundary_comparison.m` - Boundary effect comparison (NW vs LL vs LQ)
-- `example_fig4_complex.m` - Complex-valued regression
-- `example_fig5_heteroscedasticity.m` - Heteroscedastic regression with intervals (CI and PI)
-- `example_fig6_applications.m` - Real-world qEEG application
+- `example_kde.m` - 1D kernel density estimation
+- `example_boundary.m` - Boundary effect comparison (NW vs LL vs LQ)
+- `example_complex.m` - Complex-valued regression
+- `example_hetero.m` - Heteroscedastic regression with intervals (CI and PI)
+- `example_qeeg.m` - Real-world qEEG application
 
 ## Testing
 

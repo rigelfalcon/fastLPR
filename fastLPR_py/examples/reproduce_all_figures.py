@@ -36,27 +36,27 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 figure_scripts = [
     {
         "name": "Figure 2: Kernel Density Estimation (1D, 2D, 3D)",
-        "script": "example_fig2_fastkde.py",
+        "script": "example_kde.py",
         "description": "KDE with bandwidth selection in 1D, 2D, and 3D",
     },
     {
         "name": "Figure 3: Boundary Comparison (NW vs LL vs LQ)",
-        "script": "example_fig3_boundary_comparison.py",
+        "script": "example_boundary.py",
         "description": "Comparison of local polynomial regression orders",
     },
     {
         "name": "Figure 4: Complex-Valued Regression",
-        "script": "example_fig4_complex.py",
+        "script": "example_complex.py",
         "description": "Regression with complex-valued responses (log(z))",
     },
     {
         "name": "Figure 5: Heteroscedastic Regression",
-        "script": "example_fig5_heteroscedasticity.py",
+        "script": "example_hetero.py",
         "description": "Mean and variance estimation in 1D and 2D",
     },
     {
         "name": "Figure 6: Real-World Applications",
-        "script": "example_fig6_applications.py",
+        "script": "example_qeeg.py",
         "description": "qEEG log-spectrum and MRI T1 brain image regression",
     },
 ]

@@ -286,11 +286,11 @@ fastLPR_py/
 │   ├── plotting.py           # Visualization
 │   └── ... (other modules)
 ├── examples/                 # Paper examples (JSS submission)
-│   ├── example_fig2_fastkde.py
-│   ├── example_fig3_boundary_comparison.py
-│   ├── example_fig4_complex.py
-│   ├── example_fig5_heteroscedasticity.py
-│   ├── example_fig6_applications.py
+│   ├── example_kde.py
+│   ├── example_boundary.py
+│   ├── example_complex.py
+│   ├── example_hetero.py
+│   ├── example_qeeg.py
 │   └── reproduce_all_figures.py
 ├── tests/                    # Test suite
 │   ├── test_algorithm.py     # Core algorithm tests
@@ -365,10 +365,10 @@ All examples are in `examples/` and follow JSS publication standards:
 
 ```bash
 cd examples
-python example_fig2_fastkde.py           # KDE (1D, 2D, 3D)
-python example_fig3_boundary_comparison.py  # NW vs LL vs LQ
-python example_fig4_complex.py           # Complex-valued regression
-python example_fig5_heteroscedasticity.py   # Heteroscedastic regression
+python example_kde.py           # KDE (1D, 2D, 3D)
+python example_boundary.py  # NW vs LL vs LQ
+python example_complex.py           # Complex-valued regression
+python example_hetero.py   # Heteroscedastic regression
 python reproduce_all_figures.py          # Run all examples
 ```
 
