@@ -1,18 +1,25 @@
 """
-Code to generate Figure 6: Real-World Applications (qEEG and MRI)
+Code to generate the qEEG figure (fig_qeeg) for the fastLPR paper.
 
-This script reproduces Figure 6 from the fastLPR paper, demonstrating:
-  - Panel (a): 2D qEEG log-spectrum regression (age × frequency)
-  - Panel (b): 3D MRI T1 brain image regression (spatial coordinates)
+qEEG cross-spectral normative modeling (Manuscript Section 4).
+  - Data: data_qeeg_cross_only.csv (N = 66505, complex-valued response)
+  - Native complex-valued local polynomial regression (order = 1)
+  - GCV-based bandwidth selection with the 1-SE rule, effective DoF tracking
+  - Prediction and pointwise confidence bands on a dense grid
 
-The figure follows JSS publication standards with:
-  - Fixed random seed for reproducibility
-  - Consistent styling (fonts, colors, sizes)
-  - 300 DPI resolution for publication
-  - Self-contained code (no external dependencies except fastLPR)
+Five-panel figure:
+  (a) Raw data scatter on (age, frequency), colored by |y|
+  (b) GCV bandwidth selection surface over the (h1, h2) grid, 1-SE marker
+  (c) Fitted real-part surface Re(m_hat)
+  (d) Fitted imaginary-part surface Im(m_hat)
+  (e) 95% confidence band at the f = 10 Hz slice (real top, imaginary bottom)
 
-Copyright (c) 2024 fastLPR Development Team
+Self-contained (no external dependencies except fastlpr).
 """
+
+import os
+import sys
+import time
 
 import numpy as np
 import pandas as pd
@@ -20,358 +27,209 @@ import matplotlib
 
 matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import scipy.io as sio
-import time
-import os
-import sys
+from scipy.interpolate import RegularGridInterpolator
+from scipy.stats import norm
 
-# Add parent directory to path to import fastlpr
+# Add fastLPR to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from fastlpr import cv_fastlpr, get_hlist
+from fastlpr import cv_fastlpr, get_hlist, fastlpr_predict
 
 print()
 print("=" * 80)
-print("Figure 6: Real-World Applications (qEEG and MRI)")
+print("qEEG Cross-Spectral Normative Modeling")
 print("=" * 80)
 
-# Check for quick test mode (reduced samples for faster testing)
-quick_test = os.environ.get("FASTLPR_QUICK_TEST", "0") == "1"
-if quick_test:
-    print("\n[QUICK TEST MODE: Using reduced sample sizes for faster testing]")
-
 ################################################################################
-# Panel (a): 2D qEEG Log-Spectrum Regression
+# Load and explore the data
 ################################################################################
 
-print("\nPanel (a): 2D qEEG Log-Spectrum Regression...")
-
-# Load qEEG data
-data_file = os.path.join(os.path.dirname(__file__), "..", "data", "data_qeeg.csv")
-if not os.path.isfile(data_file):
-    raise FileNotFoundError(f"qEEG data file not found: {data_file}")
-
-data_table = pd.read_csv(data_file)
-
-# Subsample for quick testing
-if quick_test:
-    # Use 10% of data for quick testing
-    np.random.seed(42)
-    sample_indices = np.random.choice(
-        len(data_table), size=len(data_table) // 10, replace=False
-    )
-    data_table = data_table.iloc[sample_indices].reset_index(drop=True)
-
-print(f"  - Loaded {len(data_table)} qEEG samples")
-
-# Prepare data: X = [age (log10), frequency], y = log-spectrum
-X_qeeg = data_table[["age", "freq"]].values
-
-
-# Parse complex numbers from string format "real+imag*i"
-def parse_complex(s):
-    """Parse complex number from MATLAB-style string format."""
-    if isinstance(s, (int, float, complex)):
-        return complex(s)
-    # Replace 'i' with 'j' for Python complex number format
-    s = str(s).replace("i", "j")
-    return complex(s)
-
-
-y_qeeg_complex = data_table["log10_10"].apply(parse_complex).values
-y_qeeg = y_qeeg_complex.real  # Use real part only
-
-# Normalize predictors (REMOVED - matching MATLAB)
-# X_mean = X_qeeg.mean(axis=0)
-# X_std = X_qeeg.std(axis=0)
-# X_qeeg_norm = (X_qeeg - X_mean) / X_std
-
-print(
-    f"  - Age range: [{10**X_qeeg[:, 0].min():.1f}, {10**X_qeeg[:, 0].max():.1f}] years"
+print("\nLoading data...")
+data_file = os.path.join(
+    os.path.dirname(__file__), "..", "data", "data_qeeg_cross_only.csv"
 )
-print(f"  - Frequency range: [{X_qeeg[:, 1].min():.2f}, {X_qeeg[:, 1].max():.2f}] Hz")
-
-# Regression with bandwidth selection
-opt_qeeg = {
-    "order": 0,  # Local constant (Nadaraya-Watson) - matching MATLAB
-    "dstd": 10,
-    "kernel_type": "gaussian",
-    "verbose": False,
-}
-
-hlist_qeeg = get_hlist(
-    [5, 5], [[0.1, 1.0], [0.1, 2.0]]
-)  # Match MATLAB: age [0.1,1], freq [0.1,2]
-print(f"  - Performing regression with {len(hlist_qeeg)} bandwidth combinations...")
-
-start_time = time.time()
-regs_qeeg = cv_fastlpr(
-    X_qeeg, y_qeeg, hlist_qeeg, opt_qeeg
-)  # Use raw data, not normalized
-time_qeeg = time.time() - start_time
-
-print(f"  - Computation time: {time_qeeg:.2f} seconds")
-print(
-    f"  - Selected bandwidth: h = [{regs_qeeg.h[0]:.4f}, {regs_qeeg.h[1]:.4f}]"
-)
-
-# Create grid for visualization (in original coordinate space)
-n_grid = 50
-age_grid = np.linspace(X_qeeg[:, 0].min(), X_qeeg[:, 0].max(), n_grid)
-freq_grid = np.linspace(X_qeeg[:, 1].min(), X_qeeg[:, 1].max(), n_grid)
-Age_grid, Freq_grid = np.meshgrid(age_grid, freq_grid, indexing="ij")
-
-# Get predictions
-grid_points = np.column_stack([Age_grid.ravel(), Freq_grid.ravel()])
-Y_pred_qeeg = regs_qeeg.fpp_yhat(grid_points).reshape(Age_grid.shape)
+qeeg = pd.read_csv(data_file)
+# pandas reads the complex column as strings; convert after replacing the
+# R/MATLAB imaginary unit "i" with Python's "j".
+x = qeeg[["age", "freq"]].values
+y = qeeg["riemlogm10_1"].apply(lambda s: complex(s.replace("i", "j"))).values
+print(f"  - Observations: {x.shape[0]}")
+print(f"  - Real part range: [{y.real.min():.3f}, {y.real.max():.3f}]")
+print(f"  - Imaginary part range: [{y.imag.min():.3f}, {y.imag.max():.3f}]")
 
 ################################################################################
-# Panel (b): 3D MRI T1 Brain Image Regression
+# Bandwidth selection and model fitting
 ################################################################################
 
-print("\nPanel (b): 3D MRI T1 Brain Image Regression...")
+print("\nFitting complex-valued LPR (order = 1, GCV bandwidth selection)...")
+hlist = get_hlist([9, 9], [[1e-3, 2], [0.05, 2]])
+opt = {"order": 1, "calc_dof": True, "dstd": 1, "seed": 42, "verbose": False}
 
-# Load MRI T1 data
-mri_file = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "data",
-    "subjectimage_T1.mat",
-)
-if not os.path.isfile(mri_file):
-    raise FileNotFoundError(f"MRI data file not found: {mri_file}")
+t0 = time.time()
+result = cv_fastlpr(x, y, hlist, opt)
+elapsed = time.time() - t0
 
-mri_data = sio.loadmat(mri_file)
-Cube = mri_data["Cube"]
-print(f"  - Loaded MRI T1 data: {Cube.shape}")
-
-# Create scattered data from non-zero voxels
-I, J, K = np.where(Cube > 0)
-X_mri_full = np.column_stack([I, J, K])
-y_mri_full = Cube[Cube > 0].astype(np.float32)
-
-# Subsample to reasonable size for computational efficiency
-np.random.seed(42)
-if quick_test:
-    n_samples = min(10000, len(y_mri_full))  # 10% for quick testing
-else:
-    n_samples = min(100000, len(y_mri_full))
-
-idx_sample = np.random.permutation(len(y_mri_full))[:n_samples]
-X_mri = X_mri_full[idx_sample, :]
-y_mri = y_mri_full[idx_sample]
-
-print(f"  - Total non-zero voxels: {len(y_mri_full)}")
-print(f"  - Using {n_samples} scattered samples for regression")
-print(
-    f"  - Spatial range: [{X_mri[:, 0].min()}, {X_mri[:, 0].max()}] × "
-    f"[{X_mri[:, 1].min()}, {X_mri[:, 1].max()}] × "
-    f"[{X_mri[:, 2].min()}, {X_mri[:, 2].max()}]"
-)
-
-# Normalize predictors (COMMENTED OUT TO MATCH MATLAB)
-# X_mri_mean = X_mri.mean(axis=0)
-# X_mri_std = X_mri.std(axis=0)
-# X_mri_norm = (X_mri - X_mri_mean) / X_mri_std
-
-# Regression with bandwidth selection (use smaller grid for 3D)
-opt_mri = {
-    "order": 0,  # Local constant (order 2 not supported for 3D)
-    "dstd": 1,
-    "kernel_type": "gaussian",
-    "N": [64, 64, 64],  # Grid size for FFT
-    "verbose": False,
-}
-
-# Use fixed bandwidth for faster computation
-hlist_mri = np.array([[0.03, 0.03, 0.03]])
-print(
-    f"  - Performing regression with bandwidth h = [{hlist_mri[0, 0]:.3f}, "
-    f"{hlist_mri[0, 1]:.3f}, {hlist_mri[0, 2]:.3f}]..."
-)
-
-start_time = time.time()
-regs_mri = cv_fastlpr(X_mri, y_mri, hlist_mri, opt_mri)  # Use X_mri not X_mri_norm
-time_mri = time.time() - start_time
-
-print(f"  - Computation time: {time_mri:.2f} seconds")
-print(
-    f"  - Selected bandwidth: h = [{regs_mri.h[0]:.4f}, "
-    f"{regs_mri.h[1]:.4f}, {regs_mri.h[2]:.4f}]"
-)
-
-# Create grid for visualization (higher resolution for better quality)
-grid_res = 50
-x_range = [X_mri[:, 0].min(), X_mri[:, 0].max()]
-y_range = [X_mri[:, 1].min(), X_mri[:, 1].max()]
-z_range = [X_mri[:, 2].min(), X_mri[:, 2].max()]
-
-X_grid, Y_grid, Z_grid = np.meshgrid(
-    np.linspace(x_range[0], x_range[1], grid_res),
-    np.linspace(y_range[0], y_range[1], grid_res),
-    np.linspace(z_range[0], z_range[1], grid_res),
-    indexing="ij",
-)
-
-x_grid = np.column_stack([X_grid.ravel(), Y_grid.ravel(), Z_grid.ravel()])
-
-# Get predictions
-y_pred_mri = regs_mri.fpp_yhat(x_grid)
+h1se = np.asarray(result.gcv_yhat["h1se"], dtype=float).ravel()
+hmin = np.asarray(result.gcv_yhat["hmin"], dtype=float).ravel()
+print(f"  - Selected bandwidth (1-SE): [{h1se[0]:.4f}, {h1se[1]:.4f}]")
+print(f"  - Selected bandwidth (min):  [{hmin[0]:.4f}, {hmin[1]:.4f}]")
+if result.dof is not None:
+    print(f"  - Effective DoF: {result.dof:.1f}")
+print(f"  - Computation time: {elapsed:.1f} seconds")
 
 ################################################################################
-# Create Figure with 2 Panels
+# Prediction and confidence bands on a dense grid
+################################################################################
+
+print("\nPredicting on 100 x 100 evaluation grid...")
+n_grid = 100
+age_grid = np.linspace(x[:, 0].min(), x[:, 0].max(), n_grid)
+freq_grid = np.linspace(x[:, 1].min(), x[:, 1].max(), n_grid)
+A, F = np.meshgrid(age_grid, freq_grid, indexing="ij")
+x_eval = np.column_stack([A.ravel(), F.ravel()])
+pred = fastlpr_predict(result, x_eval)
+re_mat = pred.real.reshape(n_grid, n_grid)
+im_mat = pred.imag.reshape(n_grid, n_grid)
+
+# Pointwise standard error via the local-polynomial expression used for the
+# confidence bands: se^2 = sigma^2 * nu / (|H| * s_0), evaluated at each point.
+# (See Manuscript Section 4.) s_0 lives on the internal grid; interpolate it
+# onto the evaluation grid, mirroring the R fpp_s0 evaluator.
+resid = y - fastlpr_predict(result, x)
+sig2 = float(np.mean(np.abs(resid) ** 2))
+nu = 0.079577471546  # Gaussian kernel, d = 2, order = 1
+prod_h = float(np.prod(h1se))
+s0_grid = np.real(np.asarray(result.s0))
+s0_interp = RegularGridInterpolator(
+    result.grid, s0_grid, bounds_error=False, fill_value=None
+)
+s0_eval = np.maximum(np.real(s0_interp(x_eval)), 1e-10)
+se_eval = np.sqrt(sig2 * nu / (prod_h * s0_eval))
+zval = norm.ppf(0.975)
+
+################################################################################
+# Build the 5-panel figure
 ################################################################################
 
 print("\nCreating figure...")
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Arial"]
+fig = plt.figure(figsize=(18, 10), facecolor="w")
+# 2 x 3 grid: (a)(b) top, (c)(d) bottom on left/middle columns; the right
+# column stacks the two CI sub-plots that together form panel (e).
+gs = fig.add_gridspec(2, 3)
 
-fig = plt.figure(figsize=(14, 6), facecolor="w")
+## Panel (a): raw scatter colored by |y|
+ax_a = fig.add_subplot(gs[0, 0])
+absy = np.abs(y)
+rng = np.random.default_rng(0)
+sub = rng.choice(x.shape[0], size=min(20000, x.shape[0]), replace=False)
+sc = ax_a.scatter(x[sub, 0], x[sub, 1], c=absy[sub], s=2, cmap="viridis")
+ax_a.set_xlabel(r"$\log_{10}(\mathrm{age})$", fontsize=13)
+ax_a.set_ylabel("Frequency (Hz)", fontsize=13)
+ax_a.set_title("(a) Raw data, colored by |y|", fontsize=15, fontweight="bold")
+plt.colorbar(sc, ax=ax_a)
 
-################################################################################
-# Panel (a): qEEG 2D Surface
-################################################################################
-
-ax1 = fig.add_subplot(1, 2, 1, projection="3d")
-ax1.set_position([0.08, 0.15, 0.38, 0.75])
-
-# Plot surface
-surf1 = ax1.plot_surface(
-    Age_grid, Freq_grid, Y_pred_qeeg, cmap="viridis", edgecolor="none", alpha=0.9
+## Panel (b): GCV bandwidth selection surface
+ax_b = fig.add_subplot(gs[0, 1])
+hlist_arr = np.asarray(hlist)
+h1_u = np.unique(hlist_arr[:, 0])
+h2_u = np.unique(hlist_arr[:, 1])
+gcv_m = np.asarray(result.gcv_yhat["gcv_m"], dtype=float).ravel()
+gcv_grid = np.full((len(h1_u), len(h2_u)), np.nan)
+for k in range(hlist_arr.shape[0]):
+    i1 = int(np.searchsorted(h1_u, hlist_arr[k, 0]))
+    i2 = int(np.searchsorted(h2_u, hlist_arr[k, 1]))
+    gcv_grid[i1, i2] = gcv_m[k]
+im = ax_b.imshow(
+    gcv_grid.T,
+    origin="lower",
+    aspect="auto",
+    cmap="viridis",
+    extent=[
+        np.log10(h1_u.min()),
+        np.log10(h1_u.max()),
+        np.log10(h2_u.min()),
+        np.log10(h2_u.max()),
+    ],
 )
+plt.colorbar(im, ax=ax_b)
+ax_b.plot(np.log10(hmin[0]), np.log10(hmin[1]), "o", color="blue",
+          markersize=10, label="GCV min")
+ax_b.plot(np.log10(h1se[0]), np.log10(h1se[1]), "*", color="red",
+          markersize=18, label="1-SE")
+ax_b.set_xlabel(r"$\log_{10}(h_1)$", fontsize=13)
+ax_b.set_ylabel(r"$\log_{10}(h_2)$", fontsize=13)
+ax_b.set_title("(b) GCV bandwidth surface", fontsize=15, fontweight="bold")
+ax_b.legend(loc="upper right", fontsize=10)
 
-# Add heatmap at the bottom
-z_bottom = Y_pred_qeeg.min() - 0.5
-ax1.plot_surface(
-    Age_grid,
-    Freq_grid,
-    np.ones_like(Y_pred_qeeg) * z_bottom,
-    facecolors=plt.cm.viridis(
-        (Y_pred_qeeg - Y_pred_qeeg.min()) / (Y_pred_qeeg.max() - Y_pred_qeeg.min())
-    ),
-    edgecolor="none",
-    alpha=0.8,
+## Panel (c): fitted real-part surface
+ax_c = fig.add_subplot(gs[1, 0])
+cf = ax_c.contourf(A, F, re_mat, levels=30, cmap="viridis")
+ax_c.contour(A, F, re_mat, levels=10, colors="k", linewidths=0.4)
+plt.colorbar(cf, ax=ax_c)
+ax_c.set_xlabel(r"$\log_{10}(\mathrm{age})$", fontsize=13)
+ax_c.set_ylabel("Frequency (Hz)", fontsize=13)
+ax_c.set_title(r"(c) Fitted real part $\Re\,\hat{m}$", fontsize=15,
+               fontweight="bold")
+
+## Panel (d): fitted imaginary-part surface
+ax_d = fig.add_subplot(gs[1, 1])
+cf = ax_d.contourf(A, F, im_mat, levels=30, cmap="viridis")
+ax_d.contour(A, F, im_mat, levels=10, colors="k", linewidths=0.4)
+plt.colorbar(cf, ax=ax_d)
+ax_d.set_xlabel(r"$\log_{10}(\mathrm{age})$", fontsize=13)
+ax_d.set_ylabel("Frequency (Hz)", fontsize=13)
+ax_d.set_title(r"(d) Fitted imag part $\Im\,\hat{m}$", fontsize=15,
+               fontweight="bold")
+
+## Panel (e): 95% CI band at f = 10 Hz slice (real top, imag bottom)
+jf = int(np.argmin(np.abs(freq_grid - 10.0)))
+# x_eval was built with indexing="ij"; select rows at the chosen frequency.
+mask = np.isclose(x_eval[:, 1], freq_grid[jf])
+ag = x_eval[mask, 0]
+order = np.argsort(ag)
+ag = ag[order]
+re_slice = pred.real[mask][order]
+im_slice = pred.imag[mask][order]
+se_slice = se_eval[mask][order]
+
+ax_e1 = fig.add_subplot(gs[0, 2])
+ax_e1.fill_between(ag, re_slice - zval * se_slice, re_slice + zval * se_slice,
+                   color=(0.2, 0.2, 0.8), alpha=0.25)
+ax_e1.plot(ag, re_slice, "k-", lw=2)
+ax_e1.set_xlabel(r"$\log_{10}(\mathrm{age})$", fontsize=13)
+ax_e1.set_ylabel(r"$\Re(m)$", fontsize=13)
+ax_e1.set_title("(e) 95% CI at f = 10 Hz (real)", fontsize=14,
+                fontweight="bold")
+
+ax_e2 = fig.add_subplot(gs[1, 2])
+ax_e2.fill_between(ag, im_slice - zval * se_slice, im_slice + zval * se_slice,
+                   color=(0.8, 0.2, 0.2), alpha=0.25)
+ax_e2.plot(ag, im_slice, "k-", lw=2)
+ax_e2.set_xlabel(r"$\log_{10}(\mathrm{age})$", fontsize=13)
+ax_e2.set_ylabel(r"$\Im(m)$", fontsize=13)
+ax_e2.set_title("95% CI at f = 10 Hz (imag)", fontsize=14, fontweight="bold")
+
+fig.suptitle(
+    "qEEG Cross-Spectral Normative Modeling (fastLPR)",
+    fontsize=18,
+    fontweight="bold",
 )
-
-ax1.set_xlabel("Age (log$_{10}$ years)", fontsize=14)
-ax1.set_ylabel("Frequency (Hz)", fontsize=14)
-ax1.set_zlabel("Log-spectrum", fontsize=14)
-ax1.set_title("(a) 2D qEEG Regression", fontsize=16, fontweight="bold")
-ax1.view_init(elev=30, azim=-37.5)
-ax1.grid(True)
-ax1.tick_params(labelsize=12)
-
-# Add colorbar with padding to avoid overlap with z-axis
-cb1 = fig.colorbar(surf1, ax=ax1, shrink=0.5, aspect=10, pad=0.15)
-cb1.set_label("Log-spectrum", fontsize=12)
+plt.tight_layout(rect=[0, 0, 1, 0.97])
 
 ################################################################################
-# Panel (b): MRI 3D Volume (Scatter3 with Transparency)
+# Save figure
 ################################################################################
 
-ax2 = fig.add_subplot(1, 2, 2, projection="3d")
-ax2.set_position([0.56, 0.15, 0.38, 0.75])
-
-# Reshape predictions back to 3D grid
-y_pred_mri_3d = y_pred_mri.reshape(grid_res, grid_res, grid_res)
-
-# Normalize intensity for coloring and transparency
-y_norm = (y_pred_mri - y_pred_mri.min()) / (y_pred_mri.max() - y_pred_mri.min() + 1e-10)
-
-# Filter out low values (threshold at 0.05) to show more structure
-mask = y_norm > 0.05
-x_grid_filtered = x_grid[mask]
-y_pred_mri_filtered = y_pred_mri[mask]
-y_norm_filtered = y_norm[mask]
-
-# Map intensity to RGBA colors with per-point transparency
-# This allows seeing both skull (low intensity) and brain (high intensity)
-from matplotlib import cm
-
-cmap_mri = cm.get_cmap("jet")
-colors_mri = cmap_mri(y_norm_filtered)  # Shape: (N, 4) with RGBA
-
-# Set alpha channel based on intensity (higher intensity = more opaque)
-# Use a nonlinear mapping to enhance contrast between skull and brain
-alpha_mri = 0.05 + 0.7 * (y_norm_filtered**0.5)  # Square root for better contrast
-colors_mri[:, 3] = alpha_mri  # Set alpha channel
-
-# Compute marker size based on intensity
-marker_size = 3 + 8 * y_norm_filtered
-
-# Plot 3D scatter with per-point RGBA colors
-scatter = ax2.scatter(
-    x_grid_filtered[:, 0],
-    x_grid_filtered[:, 1],
-    x_grid_filtered[:, 2],
-    s=marker_size,
-    c=colors_mri,  # Use RGBA colors directly for per-point transparency
-    marker="o",
-    edgecolors="none",
-)
-
-ax2.set_xlabel("x (normalized)", fontsize=14)
-ax2.set_ylabel("y (normalized)", fontsize=14)
-ax2.set_zlabel("z (normalized)", fontsize=14)
-ax2.set_title("(b) 3D MRI T1 Regression", fontsize=16, fontweight="bold")
-ax2.grid(True)
-ax2.set_box_aspect([1, 1, 1])
-ax2.view_init(elev=22, azim=124)
-ax2.tick_params(labelsize=12)
-ax2.set_facecolor([0.95, 0.95, 0.95])
-
-# Add colorbar with padding to avoid overlap with z-axis
-cb2 = fig.colorbar(scatter, ax=ax2, shrink=0.5, aspect=10, pad=0.15)
-cb2.set_label("Intensity", fontsize=12)
-
-################################################################################
-# Save Figure
-################################################################################
-
-print("\nSaving figure...")
-
-# Create output directory
 fig_dir = os.path.join(os.path.dirname(__file__), "..", "fig", "reproduced")
 os.makedirs(fig_dir, exist_ok=True)
+png_path = os.path.join(fig_dir, "fig_qeeg.png")
+plt.savefig(png_path, dpi=300, bbox_inches="tight")
+print(f"  - Saved PNG: {png_path}")
+pdf_path = os.path.join(fig_dir, "fig_qeeg.pdf")
+plt.savefig(pdf_path, bbox_inches="tight")
+print(f"  - Saved PDF: {pdf_path}")
+plt.close(fig)
 
-# Save as PNG
-png_path = os.path.join(fig_dir, "fig6_applications_python.png")
-fig.savefig(png_path, dpi=300, bbox_inches="tight", facecolor="w")
-print(f"  - Saved PNG: {os.path.abspath(png_path)}")
-
-# Save as PDF
-pdf_path = os.path.join(fig_dir, "fig6_applications_python.pdf")
-fig.savefig(pdf_path, format="pdf", bbox_inches="tight", facecolor="w")
-print(f"  - Saved PDF: {os.path.abspath(pdf_path)}")
-
-################################################################################
-# Summary
-################################################################################
-
-print()
-print("=" * 80)
-print("Figure 6 Generation Complete!")
-print("=" * 80)
-print()
-
-print("Summary:")
-print(f"  Panel (a) - qEEG 2D Regression:")
-print(f"    - Samples: {len(X_qeeg)}")
-print(f"    - Computation time: {time_qeeg:.2f} sec")
-print(
-    f"    - Selected bandwidth: h = [{regs_qeeg.h[0]:.4f}, {regs_qeeg.h[1]:.4f}]"
-)
-print(f"  Panel (b) - MRI 3D Regression:")
-print(f"    - Samples: {len(X_mri)}")
-print(f"    - Computation time: {time_mri:.2f} sec")
-print(
-    f"    - Selected bandwidth: h = [{regs_mri.h[0]:.4f}, "
-    f"{regs_mri.h[1]:.4f}, {regs_mri.h[2]:.4f}]"
-)
-print(f"  Figure saved to: {os.path.abspath(fig_dir)}")
-print()
-
-# Optionally show the figure (set FASTLPR_SHOW_PLOT=1 to display)
-if os.environ.get("FASTLPR_SHOW_PLOT", "0") == "1":
-    plt.show()
-else:
-    plt.close(fig)  # Close figure to free memory
+print("\nExample completed successfully!")

@@ -1,26 +1,48 @@
 #!/usr/bin/env Rscript
-# Figure 6: Real-World Applications - CORRECTED (Base R Graphics)
+# Code to generate the qEEG figure (Figure: fig_qeeg) for the fastLPR paper.
 #
-# CRITICAL FIXES:
-#   - Panel (a): 3D surface using persp() showing MODEL OUTPUT
-#   - Panel (b): 3D scatter using scatterplot3d showing MRI data
+# qEEG cross-spectral normative modeling (Manuscript Section 4).
+#   - Data: data_qeeg_cross_only.csv (N = 66505, complex-valued response)
+#   - Native complex-valued local polynomial regression (order = 1)
+#   - GCV-based bandwidth selection with the 1-SE rule, effective DoF tracking
+#   - Prediction and pointwise confidence bands on a dense grid
+#
+# Five-panel figure:
+#   (a) Raw data scatter on (age, frequency), colored by |y|
+#   (b) GCV bandwidth selection surface over the (h1, h2) grid, 1-SE marker
+#   (c) Fitted real-part surface Re(m_hat)
+#   (d) Fitted imaginary-part surface Im(m_hat)
+#   (e) 95% confidence band at the f = 10 Hz slice (real top, imaginary bottom)
+#
+# Self-contained (no external dependencies except fastLPR_R).
 
-# Auto-detect working directory
-script_dir <- tryCatch({ dirname(sys.frame(1)$ofile) }, error = function(e) ".")
-repo_root <- normalizePath(file.path(script_dir, "../.."), mustWork = FALSE)
-if (dir.exists(file.path(repo_root, "fastLPR_R"))) setwd(repo_root)
-
-# Load fastLPR package using setup.R (sources all R files)
-source("fastLPR_R/setup.R")
-
-suppressPackageStartupMessages({
-  library(R.matlab)
-  library(Matrix)
+# Auto-detect working directory (works both when source()d and via Rscript).
+# The script lives in fastLPR_R/inst/examples; walk up to find the repo root
+# (the directory that contains fastLPR_R/setup.R) and set it as the cwd.
+script_dir <- tryCatch({
+  dirname(sys.frame(1)$ofile)
+}, error = function(e) {
+  args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- sub("^--file=", "", args[grep("^--file=", args)])
+  if (length(file_arg) == 1 && nzchar(file_arg)) dirname(normalizePath(file_arg)) else "."
 })
+find_repo_root <- function(start) {
+  d <- normalizePath(start, mustWork = FALSE)
+  for (i in 1:6) {
+    if (file.exists(file.path(d, "fastLPR_R", "setup.R"))) return(d)
+    parent <- dirname(d)
+    if (parent == d) break
+    d <- parent
+  }
+  getwd()
+}
+repo_root <- find_repo_root(script_dir)
+setwd(repo_root)
+# Load fastLPR package using setup.R
+source("fastLPR_R/setup.R")
 
 # Helper function for parula colormap (matching MATLAB's default)
 parula <- function(n) {
-  # MATLAB parula colormap - 256 colors interpolated
   colorRampPalette(c(
     "#352A87", "#363093", "#3637A0", "#353DAD", "#3243BA",
     "#2C4DC6", "#2456CD", "#1E60D5", "#1B6ADC", "#1873E0",
@@ -36,265 +58,156 @@ parula <- function(n) {
   ))(n)
 }
 
-# Helper function to map z-values to color matrix for persp()
-# This creates solid surface rendering with continuous colormap
-get_color_matrix <- function(z_matrix, n_colors = 100) {
-  # Normalize z values to [0, 1]
-  z_range <- range(z_matrix, na.rm = TRUE)
-  z_norm <- (z_matrix - z_range[1]) / (z_range[2] - z_range[1])
+cat("\n", strrep("=", 80), "\n", sep = "")
+cat("qEEG Cross-Spectral Normative Modeling\n")
+cat(strrep("=", 80), "\n\n", sep = "")
 
-  # Get parula colors
-  parula_pal <- parula(n_colors)
+################################################################################
+# Load and explore the data
+################################################################################
 
-  # Map normalized z to color indices
-  z_indices <- pmin(pmax(floor(z_norm * (n_colors - 1)) + 1, 1), n_colors)
+cat("Loading data...\n")
+qeeg <- read.csv("fastLPR_R/data/data_qeeg_cross_only.csv")
+# R's read.csv parses the complex column into the native complex type.
+y <- qeeg$riemlogm10_1
+x <- cbind(qeeg$age, qeeg$freq)
+cat(sprintf("  - Observations: %d\n", nrow(x)))
+cat(sprintf("  - Real part range: [%.3f, %.3f]\n", range(Re(y))[1], range(Re(y))[2]))
+cat(sprintf("  - Imaginary part range: [%.3f, %.3f]\n", range(Im(y))[1], range(Im(y))[2]))
 
-  # Create color matrix (needs to be (nrow-1) x (ncol-1) for persp)
-  nr <- nrow(z_matrix)
-  nc <- ncol(z_matrix)
+################################################################################
+# Bandwidth selection and model fitting
+################################################################################
 
-  # Average adjacent cells to get facet colors
-  color_matrix <- matrix(NA, nrow = nr - 1, ncol = nc - 1)
-  for (i in 1:(nr - 1)) {
-    for (j in 1:(nc - 1)) {
-      # Average the 4 corners of each facet
-      avg_idx <- round(mean(c(z_indices[i, j], z_indices[i+1, j],
-                              z_indices[i, j+1], z_indices[i+1, j+1])))
-      color_matrix[i, j] <- parula_pal[avg_idx]
-    }
-  }
+cat("\nFitting complex-valued LPR (order = 1, GCV bandwidth selection)...\n")
+hlist <- get_hlist(c(9, 9), rbind(c(1e-3, 2), c(0.05, 2)))
+opt <- list(order = 1, calc_dof = TRUE, dstd = 1, seed = 42, verbose = FALSE)
 
-  return(color_matrix)
-}
+t0 <- proc.time()
+result <- cv_fastlpr(x, y, hlist, opt)
+elapsed <- (proc.time() - t0)[3]
 
-cat("\n", strrep("=", 80), "\n")
-cat("Figure 6: qEEG and MRI Applications\n")
-cat(strrep("=", 80), "\n\n")
+h1se <- as.numeric(result$gcv_yhat$h1se)
+hmin <- as.numeric(result$gcv_yhat$hmin)
+cat(sprintf("  - Selected bandwidth (1-SE): [%.4f, %.4f]\n", h1se[1], h1se[2]))
+cat(sprintf("  - Selected bandwidth (min):  [%.4f, %.4f]\n", hmin[1], hmin[2]))
+if (!is.null(result$dof)) cat(sprintf("  - Effective DoF: %.1f\n", result$dof))
+cat(sprintf("  - Computation time: %.1f seconds\n", elapsed))
 
-### Panel (a): qEEG ###
+################################################################################
+# Prediction and confidence bands on a dense grid
+################################################################################
 
-cat("Panel (a): qEEG Regression...\n")
+cat("\nPredicting on 100 x 100 evaluation grid...\n")
+n_grid <- 100
+age_grid  <- seq(min(x[, 1]), max(x[, 1]), length.out = n_grid)
+freq_grid <- seq(min(x[, 2]), max(x[, 2]), length.out = n_grid)
+x_eval <- as.matrix(expand.grid(age_grid, freq_grid))
+pred <- fastlpr_predict(result, x_eval)
+pred_mat <- matrix(pred, nrow = n_grid, ncol = n_grid)
+re_mat <- matrix(Re(pred), nrow = n_grid, ncol = n_grid)
+im_mat <- matrix(Im(pred), nrow = n_grid, ncol = n_grid)
 
-data_table <- read.csv("fastLPR_R/data/data_qeeg.csv")
-cat(sprintf("  - %d samples\n", nrow(data_table)))
+# Pointwise standard error via the local-polynomial expression used for the
+# confidence bands: se^2 = sigma^2 * nu / (|H| * s_0), evaluated at each point.
+# (See Manuscript Section 4; fastlpr_interval() wraps this same formula.)
+resid <- y - fastlpr_predict(result, x)
+sig2  <- mean(abs(resid)^2)
+nu    <- 0.079577471546          # Gaussian kernel, d = 2, order = 1
+prod_h <- prod(h1se)
+s0_eval <- pmax(Re(result$fpp_s0$evaluate(x_eval)), 1e-10)
+se_eval <- sqrt(sig2 * nu / (prod_h * s0_eval))
+zval <- qnorm(0.975)
 
-X_qeeg <- as.matrix(data_table[, c("age", "freq")])
-# FIXED: Use as.complex() then Re() to properly handle negative real parts
-y_qeeg <- sapply(as.character(data_table$log10_10), function(s) Re(as.complex(s)))
-
-opt_qeeg <- list(order=0, dstd=10, verbose=FALSE, num_dof_sample=3)
-hlist_qeeg <- get_hlist(c(5,5), list(c(0.1,1.0), c(0.1,2.0)))
-
-t1 <- Sys.time()
-regs_qeeg <- cv_fastlpr(X_qeeg, y_qeeg, hlist_qeeg, opt_qeeg)
-cat(sprintf("  - Time: %.2f sec\n", difftime(Sys.time(), t1, units="secs")))
-
-# Create grid for 3D surface
-n_grid <- 40
-age_seq <- seq(min(X_qeeg[,1]), max(X_qeeg[,1]), length.out=n_grid)
-freq_seq <- seq(min(X_qeeg[,2]), max(X_qeeg[,2]), length.out=n_grid)
-grid_pts <- expand.grid(age=age_seq, freq=freq_seq)
-
-# Evaluate predictions on grid using fpp_yhat interpolant
-cat("  - Evaluating on grid...\n")
-y_pred_vec <- regs_qeeg$fpp_yhat$evaluate(as.matrix(grid_pts))
-y_pred_mat <- matrix(y_pred_vec, nrow=n_grid, ncol=n_grid)
-
-### Panel (b): MRI ###
-
-cat("\nPanel (b): MRI Regression...\n")
-
-mri_data <- readMat("fastLPR_R/data/subjectimage_T1.mat")
-Cube <- mri_data$Cube
-cat(sprintf("  - Dims: [%d,%d,%d]\n", dim(Cube)[1], dim(Cube)[2], dim(Cube)[3]))
-
-indices <- which(Cube > 0, arr.ind=TRUE)
-set.seed(42)
-idx <- sample(nrow(indices), min(50000, nrow(indices)))  # Reduced for speed
-X_mri <- indices[idx,]
-y_mri <- as.numeric(Cube[Cube>0][idx])
-
-opt_mri <- list(order=0, dstd=1, verbose=FALSE, N=c(64,64,64))
-hlist_mri <- matrix(c(0.03,0.03,0.03), nrow=1)
-
-t2 <- Sys.time()
-regs_mri <- cv_fastlpr(X_mri, y_mri, hlist_mri, opt_mri)
-cat(sprintf("  - Time: %.2f sec\n", difftime(Sys.time(), t2, units="secs")))
-
-# Create 3D prediction grid (matching MATLAB's 50x50x50 grid)
-cat("  - Creating prediction grid...\n")
-grid_res <- 50
-x_range <- c(min(X_mri[,1]), max(X_mri[,1]))
-y_range <- c(min(X_mri[,2]), max(X_mri[,2]))
-z_range <- c(min(X_mri[,3]), max(X_mri[,3]))
-
-x_grid_seq <- seq(x_range[1], x_range[2], length.out=grid_res)
-y_grid_seq <- seq(y_range[1], y_range[2], length.out=grid_res)
-z_grid_seq <- seq(z_range[1], z_range[2], length.out=grid_res)
-
-# Create meshgrid (like MATLAB's meshgrid)
-grid_3d <- expand.grid(x=x_grid_seq, y=y_grid_seq, z=z_grid_seq)
-x_grid <- as.matrix(grid_3d)
-
-cat(sprintf("  - Grid size: %d points (%d x %d x %d)\n",
-            nrow(x_grid), grid_res, grid_res, grid_res))
-
-# Get predictions on the grid using the interpolant
-cat("  - Evaluating predictions on grid...\n")
-y_pred_mri <- regs_mri$fpp_yhat$evaluate(x_grid)
-
-# Use grid points and predictions for visualization
-X_vis <- x_grid
-y_vis <- y_pred_mri
-cat(sprintf("  - Total grid points for visualization: %d\n", length(y_vis)))
-
-### Create Figure ###
+################################################################################
+# Build the 5-panel figure
+################################################################################
 
 cat("\nCreating figure...\n")
-dir.create("fastLPR_R/fig/reproduced", showWarnings=FALSE, recursive=TRUE)
+dir.create("fastLPR_R/fig/reproduced", showWarnings = FALSE, recursive = TRUE)
+png("fastLPR_R/fig/reproduced/fig_qeeg.png", width = 4500, height = 3000, res = 300)
+# 2 x 3 layout: panels (a)-(d) fill the left/middle columns; the right column
+# stacks the two CI sub-plots that together form panel (e).
+layout(matrix(c(1, 2, 5,
+                3, 4, 6), nrow = 2, byrow = TRUE))
+par(mar = c(4.5, 4.5, 3, 2), oma = c(0, 0, 2, 0))
 
-png("fastLPR_R/fig/reproduced/fig6_applications_r.png",
-    width=14, height=6, units="in", res=300)
-par(mfrow=c(1,2), mar=c(3,3,3,2))
+## Panel (a): raw scatter colored by |y|
+absy <- Mod(y)
+sub <- sample(nrow(x), min(20000, nrow(x)))  # subsample for plotting clarity
+col_idx <- pmax(1, pmin(100, ceiling((absy[sub] - min(absy)) /
+                        (max(absy) - min(absy) + 1e-12) * 99) + 1))
+pal <- parula(100)
+plot(x[sub, 1], x[sub, 2], col = pal[col_idx], pch = 19, cex = 0.25,
+     xlab = expression(log[10](age)), ylab = "Frequency (Hz)",
+     main = "(a) Raw data, colored by |y|", font.main = 2, cex.main = 1.3,
+     cex.lab = 1.2)
 
-# Panel (a): 3D Surface with Height-Based Color Encoding
-# NOTE: R's persp() cannot overlay a separate contour plot at z_bottom like MATLAB's surf()
-# Instead, we use persp() with colored facets (MATLAB equivalent approach)
-# The MATLAB version shows surface + heatmap at bottom, but persp() doesn't support multiple surfaces
-
-col_matrix_qeeg <- get_color_matrix(y_pred_mat)
-
-persp_result_a <- persp(age_seq, freq_seq, y_pred_mat,
-                           theta=-37.5, phi=30,
-                           col=col_matrix_qeeg,
-                           border=NA, shade=0.4,
-                           xlab="Age (log10)", ylab="Freq (Hz)", zlab="Log-spec",
-                           main="(a) 2D qEEG Regression",
-                           cex.main=1.3, font.main=2,
-                           ticktype="detailed")
-
-# Add filled contour heatmap projected at z_bottom (matching MATLAB's surf() at bottom)
-# MATLAB uses a second surf() call to create a colored heatmap projection
-# R: Create a grid of colored polygons at z_bottom to simulate filled heatmap
-z_bottom <- min(y_pred_mat) - 0.5
-
-# Get parula colors for the z values
-n_colors <- 100
-parula_pal <- parula(n_colors)
-z_range <- range(y_pred_mat)
-z_norm <- (y_pred_mat - z_range[1]) / (z_range[2] - z_range[1])
-# Ensure color_indices is a matrix, not array
-color_indices <- matrix(pmax(1, pmin(n_colors, ceiling(z_norm * (n_colors - 1)) + 1)),
-                        nrow = nrow(y_pred_mat), ncol = ncol(y_pred_mat))
-
-# Create filled rectangular patches at z_bottom (like MATLAB's surf heatmap)
-# For each grid cell, draw a colored polygon at the bottom
-for (i in 1:(n_grid - 1)) {
-  for (j in 1:(n_grid - 1)) {
-    # Get 4 corners of grid cell
-    x_corners <- c(age_seq[i], age_seq[i+1], age_seq[i+1], age_seq[i])
-    y_corners <- c(freq_seq[j], freq_seq[j], freq_seq[j+1], freq_seq[j+1])
-    z_corners <- rep(z_bottom, 4)
-
-    # Transform to 3D perspective coordinates
-    coords_3d <- trans3d(x_corners, y_corners, z_corners, persp_result_a)
-
-    # Use average color of 4 corners for this patch (matching get_color_matrix logic)
-    # Extract color indices for the 4 corners as scalars
-    idx1 <- color_indices[i, j]
-    idx2 <- color_indices[i+1, j]
-    idx3 <- color_indices[i, j+1]
-    idx4 <- color_indices[i+1, j+1]
-    avg_color_idx <- round(mean(c(idx1, idx2, idx3, idx4)))
-    cell_color <- parula_pal[avg_color_idx]
-
-    # Draw filled polygon at z_bottom with semi-transparency (matching MATLAB's FaceAlpha=0.8)
-    polygon(coords_3d$x, coords_3d$y, col = adjustcolor(cell_color, alpha.f = 0.8), border = NA)
-  }
+## Panel (b): GCV bandwidth selection surface
+h1_u <- sort(unique(hlist[, 1]))
+h2_u <- sort(unique(hlist[, 2]))
+gcv_mat <- matrix(NA, length(h1_u), length(h2_u))
+for (k in seq_len(nrow(hlist))) {
+  i1 <- match(hlist[k, 1], h1_u)
+  i2 <- match(hlist[k, 2], h2_u)
+  gcv_mat[i1, i2] <- result$gcv_yhat$gcv_m[k]
 }
+image(log10(h1_u), log10(h2_u), gcv_mat, col = parula(100),
+      xlab = expression(log[10](h[1])), ylab = expression(log[10](h[2])),
+      main = "(b) GCV bandwidth surface", font.main = 2, cex.main = 1.3,
+      cex.lab = 1.2)
+contour(log10(h1_u), log10(h2_u), gcv_mat, add = TRUE, col = "black", lwd = 0.4)
+points(log10(hmin[1]), log10(hmin[2]), pch = 19, col = "blue", cex = 1.6)
+points(log10(h1se[1]), log10(h1se[2]), pch = 8, col = "red", cex = 2, lwd = 2)
+legend("topright", legend = c("GCV min", "1-SE"), pch = c(19, 8),
+       col = c("blue", "red"), bg = "white", cex = 0.9)
 
-# Panel (b): 3D MRI Brain Volume with scatterplot3d
-if (!requireNamespace("scatterplot3d", quietly = TRUE)) {
-  cat("WARNING: scatterplot3d not installed. Installing from CRAN...\n")
-  install.packages("scatterplot3d", repos = "https://cloud.r-project.org")
-}
+## Panel (c): fitted real-part surface
+image(age_grid, freq_grid, re_mat, col = parula(100),
+      xlab = expression(log[10](age)), ylab = "Frequency (Hz)",
+      main = expression(bold(paste("(c) Fitted real part  ", Re(hat(m))))),
+      cex.main = 1.3, cex.lab = 1.2)
+contour(age_grid, freq_grid, re_mat, add = TRUE, col = "black", lwd = 0.4)
 
-if (requireNamespace("scatterplot3d", quietly = TRUE)) {
-  library(scatterplot3d)
+## Panel (d): fitted imaginary-part surface
+image(age_grid, freq_grid, im_mat, col = parula(100),
+      xlab = expression(log[10](age)), ylab = "Frequency (Hz)",
+      main = expression(bold(paste("(d) Fitted imag part  ", Im(hat(m))))),
+      cex.main = 1.3, cex.lab = 1.2)
+contour(age_grid, freq_grid, im_mat, add = TRUE, col = "black", lwd = 0.4)
 
-  # Match MATLAB approach exactly:
-  # 1. Normalize intensity to [0,1]
-  # 2. Set values below 0.1 to 0 (threshold)
-  # 3. Use sigmoid for alpha, linear for size
+## Panel (e): 95% CI band at f = 10 Hz slice (real top, imag bottom)
+f_target <- 10
+jf <- which.min(abs(freq_grid - f_target))
+# slice indices for this frequency column in the flattened expand.grid order
+slice_idx <- ((jf - 1) * n_grid + 1):(jf * n_grid)
+ag <- age_grid
+re_slice <- Re(pred[slice_idx]); im_slice <- Im(pred[slice_idx])
+se_slice <- se_eval[slice_idx]
+# top-right cell: real part with CI band
+plot(ag, re_slice, type = "l", lwd = 2, col = "black",
+     ylim = range(c(re_slice - zval * se_slice, re_slice + zval * se_slice)),
+     xlab = expression(log[10](age)), ylab = "Re(m)",
+     main = "(e) 95% CI at f = 10 Hz (real)",
+     font.main = 2, cex.main = 1.2, cex.lab = 1.1)
+polygon(c(ag, rev(ag)),
+        c(re_slice + zval * se_slice, rev(re_slice - zval * se_slice)),
+        col = rgb(0.2, 0.2, 0.8, 0.25), border = NA)
+lines(ag, re_slice, lwd = 2)
+# bottom-right cell: imaginary part with CI band
+plot(ag, im_slice, type = "l", lwd = 2, col = "black",
+     ylim = range(c(im_slice - zval * se_slice, im_slice + zval * se_slice)),
+     xlab = expression(log[10](age)), ylab = "Im(m)",
+     main = "95% CI at f = 10 Hz (imag)",
+     font.main = 2, cex.main = 1.2, cex.lab = 1.1)
+polygon(c(ag, rev(ag)),
+        c(im_slice + zval * se_slice, rev(im_slice - zval * se_slice)),
+        col = rgb(0.8, 0.2, 0.2, 0.25), border = NA)
+lines(ag, im_slice, lwd = 2)
 
-  # Normalize to [0,1] (like MATLAB lines 205-206)
-  y_norm <- (y_vis - min(y_vis)) / (max(y_vis) - min(y_vis) + .Machine$double.eps)
-
-  # Apply threshold: set low values to 0 (like MATLAB line 211)
-  threshold <- 0.1
-  y_norm[y_norm < threshold] <- 0
-
-  # Keep only non-zero values for plotting
-  keep_idx <- which(y_norm > 0)
-  X_vis_filtered <- X_vis[keep_idx, ]
-  y_norm_filtered <- y_norm[keep_idx]
-  y_vis_filtered <- y_vis[keep_idx]
-
-  cat(sprintf("  - Applied threshold %.2f (MATLAB approach)\n", threshold))
-  cat(sprintf("  - Kept %d/%d points (%.1f%%)\n",
-              length(keep_idx), length(y_vis), 100*length(keep_idx)/length(y_vis)))
-
-  # Compute alpha using sigmoid (like MATLAB line 214)
-  # MATLAB: alpha_data = 1./(1+exp(-y_norm))
-  alpha_vals <- 1 / (1 + exp(-y_norm_filtered))
-
-  # Compute marker size (like MATLAB line 215)
-  # MATLAB: marker_size = 5 + 10 * y_norm
-  # Scale down for R: use 0.3-1.3 range
-  marker_size <- 0.3 + 1.0 * y_norm_filtered
-
-  # Create color mapping with jet colormap (like MATLAB line 232)
-  jet_colors <- colorRampPalette(c("darkblue", "blue", "cyan", "green", "yellow", "orange", "red"))(100)
-  color_indices <- pmax(1, pmin(100, ceiling(y_norm_filtered * 99) + 1))
-  colors <- jet_colors[color_indices]
-
-  # Add alpha transparency
-  colors_with_alpha <- sapply(1:length(colors), function(i) {
-    rgb_vals <- col2rgb(colors[i]) / 255
-    rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha_vals[i])
-  })
-
-  # Plot 3D scatter
-  s3d <- scatterplot3d(X_vis_filtered[,1], X_vis_filtered[,2], X_vis_filtered[,3],
-                       color = colors_with_alpha,
-                       pch = 19,
-                       cex.symbols = marker_size,
-                       main = "(b) 3D MRI T1 Regression",
-                       xlab = "x",
-                       ylab = "y",
-                       zlab = "z",
-                       font.main = 2, cex.main = 1.3,
-                       box = TRUE, grid = TRUE,
-                       angle = 124,
-                       type = "p")
-} else {
-  # Fallback: 2D projection with warning
-  plot(X_vis[,1], X_vis[,2], pch=20, cex=0.5,
-       main="(b) 3D MRI T1 Regression\n(3D visualization requires scatterplot3d)",
-       xlab="x", ylab="y", cex.main=1.0)
-  text(mean(range(X_vis[,1])), mean(range(X_vis[,2])),
-       "Install scatterplot3d for 3D view:\ninstall.packages('scatterplot3d')",
-       cex=0.8, col="red")
-}
-
+mtext("qEEG Cross-Spectral Normative Modeling (fastLPR)",
+      outer = TRUE, cex = 1.5, font = 2, line = 0.2)
 dev.off()
 
-cat("\n", strrep("=", 80), "\n")
-cat("Figure 6 Complete!\n")
-cat("Panel (a): 3D Surface with contour projection at z_bottom (qEEG)\n")
-cat("Panel (b): 3D MRI brain volume with sigmoid transparency (MATLAB approach)\n")
-cat("  - Threshold: 0.1 (normalized), keeps ~90% of points\n")
-cat("  - Alpha: sigmoid function 1/(1+exp(-y_norm))\n")
-cat("  - Colormap: jet (matching MATLAB)\n")
-cat("  - Figure saved to: fastLPR_R/fig/reproduced/fig6_applications_r.png\n")
-cat(strrep("=", 80), "\n\n")
+cat("\nFigure saved to: fastLPR_R/fig/reproduced/fig_qeeg.png\n")
+cat("Example completed successfully!\n")

@@ -1,310 +1,205 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Code to generate Figure 6: Real-World Applications (qEEG and MRI)
+% Code to generate the qEEG figure (fig_qeeg) for the fastLPR paper.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% This script reproduces Figure 6 from the fastLPR paper, demonstrating:
-%   - Panel (a): 2D qEEG log-spectrum regression (age × frequency)
-%   - Panel (b): 3D MRI T1 brain image regression (spatial coordinates)
+% qEEG cross-spectral normative modeling (Manuscript Section 4).
+%   - Data: data_qeeg_cross_only.csv (N = 66505, complex-valued response)
+%   - Native complex-valued local polynomial regression (order = 1)
+%   - GCV-based bandwidth selection with the 1-SE rule, effective DoF tracking
+%   - Prediction and pointwise confidence bands on a dense grid
 %
-% The figure follows JSS publication standards with:
-%   - Fixed random seed for reproducibility
-%   - Consistent styling (fonts, colors, sizes)
-%   - 300 DPI resolution for publication
-%   - Self-contained code (no external dependencies except fastLPR)
+% Five-panel figure:
+%   (a) Raw data scatter on (age, frequency), colored by |y|
+%   (b) GCV bandwidth selection surface over the (h1, h2) grid, 1-SE marker
+%   (c) Fitted real-part surface Re(m_hat)
+%   (d) Fitted imaginary-part surface Im(m_hat)
+%   (e) 95% confidence band at the f = 10 Hz slice (real top, imaginary bottom)
 %
-% Copyright (c) 2024 fastLPR Development Team
+% Self-contained (no external dependencies except fastLPR).
+%
+% Copyright (c) 2024-2025 Ying Wang, Min Li
+% SPDX-License-Identifier: GPL-3.0-or-later
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clc; clear all; close all;
 
-% Add utility path
+% Add fastLPR utility functions to path
 addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'utility'));
 
 fprintf('\n');
 fprintf('================================================================================\n');
-fprintf('Figure 6: Real-World Applications (qEEG and MRI)\n');
-fprintf('================================================================================\n');
+fprintf('qEEG Cross-Spectral Normative Modeling\n');
+fprintf('================================================================================\n\n');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Panel (a): 2D qEEG Log-Spectrum Regression
+% Load and explore the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fprintf('\nPanel (a): 2D qEEG Log-Spectrum Regression...\n');
-
-% Load qEEG data
-dataFile = fullfile(fileparts(mfilename('fullpath')),'/../data' , 'data_qeeg.csv');
+fprintf('Loading data...\n');
+dataFile = fullfile(fileparts(mfilename('fullpath')), '..', 'data', ...
+    'data_qeeg_cross_only.csv');
 if ~isfile(dataFile)
-    error(['qEEG data file not found: ', dataFile, '\n', ...
-           'Run data/extract_qeeg_subset.m to generate it.']);
+    error('qEEG data file not found: %s', dataFile);
 end
-
-data_table = readtable(dataFile);
-fprintf('  - Loaded %d qEEG samples\n', height(data_table));
-
-% Prepare data: X = [age (log10), frequency], y = log-spectrum
-X_qeeg = [data_table.age, data_table.freq];
-y_qeeg = real(data_table.log10_10);
-
-% Normalize predictors(no need)
-% X_mean = mean(X_qeeg);
-% X_std = std(X_qeeg);
-% X_qeeg_norm = (X_qeeg - X_mean) ./ X_std;
-
-fprintf('  - Age range: [%.1f, %.1f] years\n', 10^min(X_qeeg(:,1)), 10^max(X_qeeg(:,1)));
-fprintf('  - Frequency range: [%.2f, %.2f] Hz\n', min(X_qeeg(:,2)), max(X_qeeg(:,2)));
-
-% Regression with bandwidth selection
-opt_qeeg.order = 0;  % Local linear
-opt_qeeg.dstd = 10;
-opt_qeeg.kernel_type = 'gaussian';
-
-hlist_qeeg = get_hlist([5, 5], [0.1, 1; 0.1, 2], @logspace);
-fprintf('  - Performing regression with %d bandwidth combinations...\n', size(hlist_qeeg, 1));
-
-tic;
-regs_qeeg = cv_fastlpr(X_qeeg, y_qeeg, hlist_qeeg, opt_qeeg);
-time_qeeg = toc;
-
-fprintf('  - Computation time: %.2f seconds\n', time_qeeg);
-fprintf('  - Selected bandwidth: h = [%.4f, %.4f]\n', ...
-    regs_qeeg.gcv_yhat.h1se(1), regs_qeeg.gcv_yhat.h1se(2));
-
-% Create grid for visualization
-n_grid = 50;
-age_grid = linspace(min(X_qeeg(:,1)), max(X_qeeg(:,1)), n_grid);
-freq_grid = linspace(min(X_qeeg(:,2)), max(X_qeeg(:,2)), n_grid);
-[Age_grid, Freq_grid] = ndgrid(age_grid, freq_grid);
-
-% Get predictions
-Y_pred_qeeg = regs_qeeg.fpp_yhat(Age_grid, Freq_grid);
-
-% % Convert back to original scale
-% Age_grid = Age_grid * X_std(1) + X_mean(1);
-% Freq_grid = Freq_grid * X_std(2) + X_mean(2);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Panel (b): 3D MRI T1 Brain Image Regression
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-fprintf('\nPanel (b): 3D MRI T1 Brain Image Regression...\n');
-
-% Load MRI T1 data
-mriFile = fullfile(fileparts(mfilename('fullpath')), '..', 'data', ...
-    'subjectimage_T1.mat');
-if ~isfile(mriFile)
-    error(['MRI data file not found: ', mriFile]);
+qeeg = readtable(dataFile);
+% readtable may read the complex column either as text (older MATLAB) or as a
+% native complex double (newer MATLAB). Handle both robustly.
+x = [qeeg.age, qeeg.freq];
+yraw = qeeg.riemlogm10_1;
+if iscell(yraw)
+    y = cellfun(@str2num, yraw);          % text -> native complex
+elseif istable(yraw) || isstring(yraw)
+    y = arrayfun(@(s) str2num(char(s)), yraw);
+else
+    y = yraw;                              % already numeric (complex) double
 end
-
-load(mriFile, 'Cube');
-fprintf('  - Loaded MRI T1 data: %s\n', mat2str(size(Cube)));
-
-% Create scattered data from non-zero voxels
-[I, J, K] = ind2sub(size(Cube), find(Cube > 0));
-X_mri_full = [I, J, K];
-y_mri_full = single(Cube(Cube > 0));
-
-% Subsample to reasonable size for computational efficiency
-rng(42);
-n_samples = min([100000, length(y_mri_full)]);
-
-idx_sample = randperm(length(y_mri_full), n_samples);
-X_mri = X_mri_full(idx_sample, :);
-y_mri = y_mri_full(idx_sample);
-
-fprintf('  - Total non-zero voxels: %d\n', length(y_mri_full));
-fprintf('  - Using %d scattered samples for regression\n', n_samples);
-fprintf('  - Spatial range: [%d, %d] × [%d, %d] × [%d, %d]\n', ...
-    min(X_mri(:,1)), max(X_mri(:,1)), ...
-    min(X_mri(:,2)), max(X_mri(:,2)), ...
-    min(X_mri(:,3)), max(X_mri(:,3)));
-
-% Normalize predictors
-% X_mri_mean = mean(X_mri);
-% X_mri_std = std(X_mri);
-% X_mri_norm = (X_mri - X_mri_mean) ./ X_mri_std;
-
-% Regression with bandwidth selection (use smaller grid for 3D)
-opt_mri.order = 0;  % Local constant (order 2 not supported for 3D)
-opt_mri.dstd = 1;
-opt_mri.kernel_type = 'gaussian';
-opt_mri.N = [64, 64, 64];  % Grid size for FFT
-
-% Use fixed bandwidth for faster computation
-hlist_mri = [0.03, 0.03, 0.03];
-fprintf('  - Performing regression with bandwidth h = [%.3f, %.3f, %.3f]...\n', ...
-    hlist_mri(1), hlist_mri(2), hlist_mri(3));
-
-tic;
-regs_mri = cv_fastlpr(X_mri, y_mri, hlist_mri, opt_mri);
-time_mri = toc;
-
-fprintf('  - Computation time: %.2f seconds\n', time_mri);
-fprintf('  - Selected bandwidth: h = [%.4f, %.4f, %.4f]\n', ...
-    regs_mri.gcv_yhat.h1se(1), regs_mri.gcv_yhat.h1se(2), regs_mri.gcv_yhat.h1se(3));
-
-% Create grid for visualization (higher resolution for better quality)
-grid_res = 50;  % Increased from 25 for better slice panel resolution
-x_range = [min(X_mri(:,1)), max(X_mri(:,1))];
-y_range = [min(X_mri(:,2)), max(X_mri(:,2))];
-z_range = [min(X_mri(:,3)), max(X_mri(:,3))];
-
-[X_grid, Y_grid, Z_grid] = meshgrid(...
-    linspace(x_range(1), x_range(2), grid_res), ...
-    linspace(y_range(1), y_range(2), grid_res), ...
-    linspace(z_range(1), z_range(2), grid_res));
-
-x_grid = [X_grid(:), Y_grid(:), Z_grid(:)];
-
-% Get predictions
-y_pred_mri = regs_mri.fpp_yhat(x_grid);
+y = y(:);
+fprintf('  - Observations: %d\n', size(x, 1));
+fprintf('  - Real part range: [%.3f, %.3f]\n', min(real(y)), max(real(y)));
+fprintf('  - Imaginary part range: [%.3f, %.3f]\n', min(imag(y)), max(imag(y)));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Create Figure with 2 Panels
+% Bandwidth selection and model fitting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+fprintf('\nFitting complex-valued LPR (order = 1, GCV bandwidth selection)...\n');
+hlist = get_hlist([9, 9], [1e-3, 2; 0.05, 2], @logspace);
+opt = struct('order', 1, 'calc_dof', true, 'dstd', 1, 'seed', 42, ...
+    'verbose', false);
+
+t0 = tic;
+result = cv_fastlpr(x, y, hlist, opt);
+elapsed = toc(t0);
+
+h1se = result.gcv_yhat.h1se(:).';
+hmin = result.gcv_yhat.hmin(:).';
+dof = result.gcv_yhat.df_m(result.gcv_yhat.idmin(1));  % DoF at GCV minimum
+fprintf('  - Selected bandwidth (1-SE): [%.4f, %.4f]\n', h1se(1), h1se(2));
+fprintf('  - Selected bandwidth (min):  [%.4f, %.4f]\n', hmin(1), hmin(2));
+fprintf('  - Effective DoF: %.1f\n', dof);
+fprintf('  - Computation time: %.1f seconds\n', elapsed);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Prediction and confidence bands on a dense grid
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+fprintf('\nPredicting on 100 x 100 evaluation grid...\n');
+n_grid = 100;
+age_grid  = linspace(min(x(:,1)), max(x(:,1)), n_grid);
+freq_grid = linspace(min(x(:,2)), max(x(:,2)), n_grid);
+[Age, Freq] = ndgrid(age_grid, freq_grid);
+x_eval = [Age(:), Freq(:)];
+pred = fastlpr_predict(result, x_eval);
+re_mat = reshape(real(pred), n_grid, n_grid);
+im_mat = reshape(imag(pred), n_grid, n_grid);
+
+% Pointwise standard error via the local-polynomial expression used for the
+% confidence bands: se^2 = sigma^2 * nu / (|H| * s_0), evaluated at each point.
+% (See Manuscript Section 4.)
+resid = y - fastlpr_predict(result, x);
+sig2 = mean(abs(resid).^2);
+nu = 0.079577471546;          % Gaussian kernel, d = 2, order = 1
+prod_h = prod(h1se);
+s0_eval = max(real(result.fpp_s0(Age(:), Freq(:))), 1e-10);
+se_eval = sqrt(sig2 .* nu ./ (prod_h .* s0_eval));
+se_mat = reshape(se_eval, n_grid, n_grid);
+zval = norminv(0.975);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Build the 5-panel figure
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('\nCreating figure...\n');
+fig = figure('Position', [50, 50, 1800, 1000], 'Color', 'w');
+tl = tiledlayout(2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-fig = figure('Position', [100, 100, 1400, 600], 'Color', 'w');
+% Panel (a): raw scatter colored by |y|
+nexttile(1);
+absy = abs(y);
+rng(0);
+sub = randperm(size(x, 1), min(20000, size(x, 1)));
+scatter(x(sub, 1), x(sub, 2), 3, absy(sub), 'filled');
+colormap(gca, parula); colorbar;
+xlabel('log_{10}(age)'); ylabel('Frequency (Hz)');
+title('(a) Raw data, colored by |y|', 'FontWeight', 'bold');
 
-% Set default font
-set(groot, 'defaultAxesFontName', 'Arial');
-set(groot, 'defaultTextFontName', 'Arial');
+% Panel (b): GCV bandwidth selection surface
+nexttile(2);
+h1_u = unique(hlist(:, 1));
+h2_u = unique(hlist(:, 2));
+gcv_grid = nan(numel(h1_u), numel(h2_u));
+gcv_m = result.gcv_yhat.gcv_m(:);
+for k = 1:size(hlist, 1)
+    [~, i1] = min(abs(h1_u - hlist(k, 1)));
+    [~, i2] = min(abs(h2_u - hlist(k, 2)));
+    gcv_grid(i1, i2) = gcv_m(k);
+end
+imagesc(log10(h1_u), log10(h2_u), gcv_grid.');
+set(gca, 'YDir', 'normal'); colormap(gca, parula); colorbar; hold on;
+plot(log10(hmin(1)), log10(hmin(2)), 'o', 'MarkerFaceColor', 'b', ...
+    'MarkerEdgeColor', 'b', 'MarkerSize', 10, 'DisplayName', 'GCV min');
+plot(log10(h1se(1)), log10(h1se(2)), 'p', 'MarkerFaceColor', 'r', ...
+    'MarkerEdgeColor', 'r', 'MarkerSize', 16, 'DisplayName', '1-SE');
+xlabel('log_{10}(h_1)'); ylabel('log_{10}(h_2)');
+title('(b) GCV bandwidth surface', 'FontWeight', 'bold');
+legend('Location', 'northeast'); hold off;
+
+% Panel (c): fitted real-part surface
+nexttile(4);
+contourf(Age, Freq, re_mat, 30, 'LineColor', 'none'); hold on;
+contour(Age, Freq, re_mat, 10, 'k', 'LineWidth', 0.4);
+colormap(gca, parula); colorbar;
+xlabel('log_{10}(age)'); ylabel('Frequency (Hz)');
+title('(c) Fitted real part Re(m)', 'FontWeight', 'bold'); hold off;
+
+% Panel (d): fitted imaginary-part surface
+nexttile(5);
+contourf(Age, Freq, im_mat, 30, 'LineColor', 'none'); hold on;
+contour(Age, Freq, im_mat, 10, 'k', 'LineWidth', 0.4);
+colormap(gca, parula); colorbar;
+xlabel('log_{10}(age)'); ylabel('Frequency (Hz)');
+title('(d) Fitted imag part Im(m)', 'FontWeight', 'bold'); hold off;
+
+% Panel (e): 95% CI band at f = 10 Hz slice (real top, imag bottom)
+[~, jf] = min(abs(freq_grid - 10));
+ag = age_grid(:);
+re_slice = re_mat(:, jf);
+im_slice = im_mat(:, jf);
+se_slice = se_mat(:, jf);
+
+nexttile(3);
+fill([ag; flipud(ag)], ...
+     [re_slice + zval * se_slice; flipud(re_slice - zval * se_slice)], ...
+     [0.2, 0.2, 0.8], 'FaceAlpha', 0.25, 'EdgeColor', 'none'); hold on;
+plot(ag, re_slice, 'k-', 'LineWidth', 2);
+xlabel('log_{10}(age)'); ylabel('Re(m)');
+title('(e) 95% CI at f = 10 Hz (real)', 'FontWeight', 'bold'); hold off;
+
+nexttile(6);
+fill([ag; flipud(ag)], ...
+     [im_slice + zval * se_slice; flipud(im_slice - zval * se_slice)], ...
+     [0.8, 0.2, 0.2], 'FaceAlpha', 0.25, 'EdgeColor', 'none'); hold on;
+plot(ag, im_slice, 'k-', 'LineWidth', 2);
+xlabel('log_{10}(age)'); ylabel('Im(m)');
+title('95% CI at f = 10 Hz (imag)', 'FontWeight', 'bold'); hold off;
+
+title(tl, 'qEEG Cross-Spectral Normative Modeling (fastLPR)', ...
+    'FontWeight', 'bold', 'FontSize', 16);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Panel (a): qEEG 2D Surface
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-subplot('Position', [0.08, 0.15, 0.38, 0.75]);
-surf(Age_grid, Freq_grid, Y_pred_qeeg, 'EdgeColor', 'none', 'FaceAlpha', 0.9);
-hold on;
-% Add heatmap at the bottom
-z_bottom = min(Y_pred_qeeg(:)) - 0.5;
-surf(Age_grid, Freq_grid, ones(size(Y_pred_qeeg))*z_bottom, Y_pred_qeeg, ...
-    'EdgeColor', 'none', 'FaceAlpha', 0.8);
-hold off;
-xlabel('Age (log_{10} years)', 'FontSize', 14);
-ylabel('Frequency (Hz)', 'FontSize', 14);
-zlabel('Log-spectrum', 'FontSize', 14);
-title('(a) 2D qEEG Regression', 'FontSize', 16, 'FontWeight', 'bold');
-colormap(gca, 'parula');
-cb1 = colorbar;
-ylabel(cb1, 'Log-spectrum', 'FontSize', 12);
-set(gca, 'FontSize', 12);
-view(-37.5, 30);
-grid on;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Panel (b): MRI 3D Volume (Scatter3 with Transparency + 3-Axis Slicing)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-subplot('Position', [0.56, 0.15, 0.38, 0.75]);
-hold on;
-
-% Reshape predictions back to 3D grid
-y_pred_mri_3d = reshape(y_pred_mri, grid_res, grid_res, grid_res);
-
-% Normalize intensity for coloring and transparency
-y_norm = (y_pred_mri - min(y_pred_mri)) / (max(y_pred_mri) - min(y_pred_mri) + eps);
-
-% Apply sigmoid transformation for better contrast (beta=5)
-sigmoid = @(x, beta) 1 ./ (1 + exp(-beta * (x - 0.5)));
-
-% Set low values to transparent (threshold at 0.1)
-y_norm(y_norm<0.1)=0;
-
-% Compute alpha and marker size based on transformed values
-alpha_data= 1./(1+exp(-y_norm));
-marker_size = 5 + 10 * y_norm;
-
-% Plot 3D scatter with variable size and transparency
-s = scatter3(x_grid(:,1), x_grid(:,2), x_grid(:,3), marker_size, y_pred_mri, 'filled');
-s.AlphaData = alpha_data;
-s.MarkerFaceAlpha = 'flat';
-
-hold off;
-
-xlabel('x (normalized)', 'FontSize', 14);
-ylabel('y (normalized)', 'FontSize', 14);
-zlabel('z (normalized)', 'FontSize', 14);
-title('(b) 3D MRI T1 Regression', 'FontSize', 16, 'FontWeight', 'bold');
-grid on;
-box on;
-view(124, 22);
-axis equal;
-colormap(gca, jet);
-cb2 = colorbar;
-ylabel(cb2, 'Intensity', 'FontSize', 12);
-set(gca, 'FontSize', 12);
-set(gca, 'Color', [0.95 0.95 0.95]);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Save Figure
+% Save figure
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 fprintf('\nSaving figure...\n');
-
-% Create output directories if they don't exist
 figDir = fullfile(fileparts(mfilename('fullpath')), '..', 'fig', 'reproduced');
-docFigDir = fullfile(fileparts(mfilename('fullpath')), '..', 'doc', 'fig');
 if ~exist(figDir, 'dir')
     mkdir(figDir);
 end
-if ~exist(docFigDir, 'dir')
-    mkdir(docFigDir);
-end
-
-% Save full composite as PNG (300 DPI for publication)
-pngPath = fullfile(figDir, 'fig6_applications_matlab.png');
+pngPath = fullfile(figDir, 'fig_qeeg.png');
 exportgraphics(fig, pngPath, 'Resolution', 300);
-fprintf('  - Saved full composite PNG: %s\n', pngPath);
-
-% Save as MATLAB figure
-figPath = fullfile(figDir, 'fig6_applications_matlab.fig');
+fprintf('  - Saved PNG: %s\n', pngPath);
+figPath = fullfile(figDir, 'fig_qeeg.fig');
 savefig(fig, figPath);
 fprintf('  - Saved FIG: %s\n', figPath);
 
-% Save individual panels for manuscript (doc/fig/)
-fprintf('  - Saving individual panels to doc/fig/...\n');
-% Panel names: (a) qEEG 2D Regression, (b) MRI 3D Regression
-panel_names = {'a_qeeg', 'b_mri_3d'};
-% Get all axes handles (exclude colorbar etc)
-allaxes = findall(fig, 'type', 'axes');
-plotaxes = allaxes(arrayfun(@(ax) ~strcmp(get(ax, 'Tag'), 'Colorbar'), allaxes));
-% Sort by position (left to right): sort by x ascending
-pos = cell2mat(arrayfun(@(ax) get(ax, 'Position'), plotaxes, 'UniformOutput', false));
-[~, sortIdx] = sortrows([pos(:,1)]);
-plotaxes = plotaxes(sortIdx);
-
-for i = 1:min(2, length(plotaxes))
-    panelPath = fullfile(docFigDir, sprintf('fig6_%s.png', panel_names{i}));
-    exportgraphics(plotaxes(i), panelPath, 'Resolution', 300);
-    fprintf('    Panel (%c): %s\n', 'a'+i-1, panelPath);
-end
-
-% Also save full composite to doc/fig/ for reference
-compositePath = fullfile(docFigDir, 'fig6_qeeg.png');
-exportgraphics(fig, compositePath, 'Resolution', 300);
-fprintf('  - Saved full composite to doc/fig/: %s\n', compositePath);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Summary
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-fprintf('\n');
-fprintf('================================================================================\n');
-fprintf('Figure 6 Generation Complete!\n');
-fprintf('================================================================================\n\n');
-
-fprintf('Summary:\n');
-fprintf('  Panel (a) - qEEG 2D Regression:\n');
-fprintf('    - Samples: %d\n', size(X_qeeg, 1));
-fprintf('    - Computation time: %.2f sec\n', time_qeeg);
-fprintf('    - Selected bandwidth: h = [%.4f, %.4f]\n', ...
-    regs_qeeg.gcv_yhat.h1se(1), regs_qeeg.gcv_yhat.h1se(2));
-fprintf('  Panel (b) - MRI 3D Regression:\n');
-fprintf('    - Samples: %d\n', size(X_mri, 1));
-fprintf('    - Computation time: %.2f sec\n', time_mri);
-fprintf('    - Selected bandwidth: h = [%.4f, %.4f, %.4f]\n', ...
-    regs_mri.gcv_yhat.h1se(1), regs_mri.gcv_yhat.h1se(2), regs_mri.gcv_yhat.h1se(3));
-fprintf('  Figure saved to: %s\n', figDir);
-
-fprintf('\n');
-
+fprintf('\nExample completed successfully!\n');
