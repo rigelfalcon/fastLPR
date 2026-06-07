@@ -284,6 +284,7 @@ def compute_gcv(
     metric: str = "gcv",
     dof_stderr: float = 0.0,
     penalty_std: float = 0.0,
+    penalty_mean: float = None,
     aggregation: str = "first",
 ) -> Tuple[float, dict]:
     """
@@ -384,7 +385,13 @@ def compute_gcv(
         pdof_for_penalty = max(pdof, 0.01)
 
         # Compute GCV penalty: 1/pdof^2
-        penalty = 1.0 / (pdof_for_penalty**2)
+        # If a per-sample mean penalty was supplied (mean(1/pdof^2) across DOF
+        # samples), use it to match MATLAB/R. Otherwise fall back to computing
+        # the penalty from the mean DOF (1/(1-dof_mean/N)^2).
+        if penalty_mean is not None:
+            penalty = float(penalty_mean)
+        else:
+            penalty = 1.0 / (pdof_for_penalty**2)
 
         # GCV = MSE * penalty - compute per column
         gcv_per_col = mse_per_col * penalty  # Shape: (dy,)
@@ -1325,6 +1332,12 @@ def estimate_dof_nufft_vectorized(
         # This is the EXACT standard deviation, not delta method approximation!
         penalty_std = np.std(penalty_samples, axis=0, ddof=1)  # Shape: (dh,)
 
+        # Per-sample mean penalty: mean(1/pdof^2) across DOF samples.
+        # This matches MATLAB (fastlpr_dof.m) and R (fastlpr_y.R penalty_mean),
+        # which average the per-sample penalty rather than computing
+        # 1/(1-dof_mean/N)^2 from the mean DOF.
+        penalty_mean = np.mean(penalty_samples, axis=0)  # Shape: (dh,)
+
         # Also compute adjusted mean DOF for complex data
         if y_is_complex:
             # pdof_complex = 2*pdof_real - 1
@@ -1334,8 +1347,11 @@ def estimate_dof_nufft_vectorized(
             dof_mean = n * (1 - pdof_mean_clamped)
     else:
         penalty_std = np.zeros(dh)
+        # Single sample: per-sample mean equals 1/(1-dof_mean/N)^2, which is what
+        # compute_gcv computes when penalty_mean is None. Signal fallback.
+        penalty_mean = None
 
-    return dof_mean, dof_stderr, penalty_std
+    return dof_mean, dof_stderr, penalty_std, penalty_mean
 
 
 def nufft_regression_with_precomputed_kdf(

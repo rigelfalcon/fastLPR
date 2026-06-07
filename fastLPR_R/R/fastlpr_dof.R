@@ -88,7 +88,9 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
     #   - Even RNGkind("Mersenne-Twister") doesn't help (different seed init)
     # For cross-language reproducibility, use opt$dof_random_vectors from MATLAB.
     # For R-only use, statistical equivalence is sufficient (same N(0,1) distribution).
-    if (!is.null(regs$opt$seed)) set.seed(regs$opt$seed)
+    dof_seed <- regs$opt$dof_seed
+    if (is.null(dof_seed)) dof_seed <- if (!is.null(regs$opt$seed)) regs$opt$seed else 42
+    set.seed(dof_seed)
     p <- matrix(rnorm(Tx * num_samples), nrow = Tx, ncol = num_samples)
   }
 
@@ -100,8 +102,8 @@ fastlpr_dof_hutchinson <- function(regs, num_samples = 10) {
   # Passing p with shape (Tx, num_samples) processes ALL samples in ONE call!
   # Output: mq with shape (Ng, dh, num_samples) - exactly what we need
   #
-  # OLD APPROACH (SLOW): Loop over num_samples, call fastlpr_reg separately
-  # NEW APPROACH (FAST): Single call, broadcast across samples automatically
+  # Vectorized: single fastlpr_reg call processes all samples at once via
+  # the dy (multi-response) broadcast, instead of looping over num_samples.
 
   # CRITICAL: Use the ORIGINAL regs$s (design matrix) that was already computed!
   # The design matrix depends on kernel weights at data locations, NOT on response values.

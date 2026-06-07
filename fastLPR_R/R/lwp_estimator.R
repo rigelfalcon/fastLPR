@@ -446,6 +446,9 @@ complex_sign <- function(x) {
   if (order == 1 && dx == 1) {
     s1 <- S[[1]]; s2 <- S[[2]]; s3 <- S[[3]]
     t1 <- T[[1]]; t2 <- T[[2]]
+    # Diagonal Tikhonov is applied once upstream in
+    # apply_adaptive_regularization_r() (matching MATLAB), so S already
+    # carries it here. We keep only the small det floor below as a guard.
     det_S <- s1 * s3 - s2^2
     det_S <- pmax(abs(det_S), .Machine$double.eps * 1e6) * complex_sign(det_S)
     if (needs_broadcast) return(bdiv(bmul(s3, t1) - bmul(s2, t2), det_S))
@@ -477,12 +480,20 @@ complex_sign <- function(x) {
         n_spatial <- length(S[[1]])
         t_dims <- dim(T[[1]])
         dh_val <- t_dims[length(t_dims)]
-        T_cx <- lapply(T, function(x) if (is.complex(x)) x else as.complex(x))
+        # Preserve dim attributes: as.complex() drops them for real inputs,
+        # which would leave the Rcpp result without a dim to copy back.
+        t_is_real <- !is.complex(T[[1]])
+        T_cx <- lapply(T, function(x) {
+          if (is.complex(x)) return(x)
+          xc <- as.complex(x); dim(xc) <- dim(x); xc
+        })
         result <- tryCatch(
           rcpp_fn(S, T_cx, as.integer(n_spatial), as.integer(dh_val), regularization),
           error = function(e) NULL
         )
         if (!is.null(result)) {
+          # Match the R fallback: real input yields a real estimate.
+          if (t_is_real) result <- Re(result)
           dim(result) <- t_dims
           return(result)
         }
@@ -512,12 +523,20 @@ complex_sign <- function(x) {
         n_spatial <- length(S[[1]])
         t_dims <- dim(T[[1]])
         dh_val <- t_dims[length(t_dims)]
-        T_cx <- lapply(T, function(x) if (is.complex(x)) x else as.complex(x))
+        # Preserve dim attributes: as.complex() drops them for real inputs,
+        # which would leave the Rcpp result without a dim to copy back.
+        t_is_real <- !is.complex(T[[1]])
+        T_cx <- lapply(T, function(x) {
+          if (is.complex(x)) return(x)
+          xc <- as.complex(x); dim(xc) <- dim(x); xc
+        })
         result <- tryCatch(
           rcpp_fn(S, T_cx, as.integer(n_spatial), as.integer(dh_val), regularization),
           error = function(e) NULL
         )
         if (!is.null(result)) {
+          # Match the R fallback: real input yields a real estimate.
+          if (t_is_real) result <- Re(result)
           dim(result) <- t_dims
           return(result)
         }

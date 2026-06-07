@@ -915,6 +915,11 @@ ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list,
 
     double eps_reg = 2.220446e-16 * 1e6;  // .Machine$double.eps * 1e6
 
+    // NOTE: diagonal Tikhonov regularization is applied once upstream in
+    // apply_adaptive_regularization_r() (matching MATLAB fastlpr_reg.m), so
+    // S already carries it here. We only keep a tiny denominator floor below
+    // as a final divide-by-zero guard.
+
     #ifdef _OPENMP
     #pragma omp parallel for schedule(static)
     #endif
@@ -922,8 +927,10 @@ ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list,
         size_t offset = (size_t)j * n_spatial;
         for (int i = 0; i < n_spatial; ++i) {
             // S values (real, spatial-only)
-            double s1 = S1[i], s2 = S2[i], s3 = S3[i], s4 = S4[i], s5 = S5[i];
-            double s6 = S6[i], s7 = S7[i], s8 = S8[i], s9 = S9[i], s10 = S10[i];
+            double s1 = S1[i], s2 = S2[i], s3 = S3[i], s4 = S4[i];
+            double s5 = S5[i];
+            double s6 = S6[i], s7 = S7[i], s8 = S8[i], s9 = S9[i];
+            double s10 = S10[i];
 
             // T values (complex, spatial + bandwidth)
             size_t idx = i + offset;
@@ -968,10 +975,14 @@ ComplexVector rcpp_cramer_3d_order1(List S_list, List T_list,
         }
     }
 
-    // Set dimensions to match T layout
-    IntegerVector dims = T1.attr("dim");
-    if (dims.size() > 0) {
-        result.attr("dim") = dims;
+    // Set dimensions to match T layout. Guard against a NULL/absent dim
+    // attribute (e.g. when as.complex() stripped dims from a real T).
+    SEXP dim_attr = T1.attr("dim");
+    if (!Rf_isNull(dim_attr)) {
+        IntegerVector dims(dim_attr);
+        if (dims.size() > 0) {
+            result.attr("dim") = dims;
+        }
     }
     return result;
 }
@@ -991,6 +1002,11 @@ ComplexVector rcpp_cramer_2d_order1(List S_list, List T_list,
     size_t t_size = (size_t)n_spatial * dh;
     ComplexVector result(t_size);
     double eps_reg = 2.220446e-16 * 1e6;
+
+    // NOTE: diagonal Tikhonov regularization is applied once upstream in
+    // apply_adaptive_regularization_r() (matching MATLAB fastlpr_reg.m), so
+    // S already carries it here. We only keep a tiny denominator floor below
+    // as a final divide-by-zero guard.
 
     #ifdef _OPENMP
     #pragma omp parallel for schedule(static)
@@ -1021,8 +1037,14 @@ ComplexVector rcpp_cramer_2d_order1(List S_list, List T_list,
         }
     }
 
-    IntegerVector dims = T1.attr("dim");
-    if (dims.size() > 0) result.attr("dim") = dims;
+    // Preserve T1's dim attribute when present. Guard against a NULL/absent
+    // attribute (e.g. when as.complex() stripped dims from a real T), which
+    // would otherwise abort with "Not compatible: NULL -> integer".
+    SEXP dim_attr = T1.attr("dim");
+    if (!Rf_isNull(dim_attr)) {
+        IntegerVector dims(dim_attr);
+        if (dims.size() > 0) result.attr("dim") = dims;
+    }
     return result;
 }
 

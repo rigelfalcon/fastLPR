@@ -63,11 +63,16 @@ function s_reg = apply_adaptive_regularization(regs)
 
 nt = regs.lwp.nt;  % Regularize ALL diagonal elements of the design matrix
 
+% S is stored column-major lower-triangular, so the k-th diagonal element
+% S(k,k) is at storage index k + (k-1)*(2*nt - k)/2. (The earlier k*(k+1)/2
+% was the row-major upper-triangular formula; for nt>=3 it perturbed an
+% off-diagonal moment and missed a true diagonal.)
+diag_idx_of = @(k) k + (k-1)*(2*nt - k)/2;
+
 % Find the maximum diagonal element across all spatial points
 max_diag = max(abs(regs.s{1}(:)));  % Start with S11
 for k = 2:nt
-    diag_idx = k*(k+1)/2;  % Diagonal index in lower triangular storage
-    max_diag = max(max_diag, max(abs(regs.s{diag_idx}(:))));
+    max_diag = max(max_diag, max(abs(regs.s{diag_idx_of(k)}(:))));
 end
 
 % Add a small, fixed regularization relative to the max diagonal
@@ -79,7 +84,7 @@ lambda_fixed = alpha * max_diag;
 % Apply regularization to diagonal elements: S_reg = S + lambda*I
 s_reg = regs.s;
 for k = 1:nt
-    diag_idx = k*(k+1)/2;
+    diag_idx = diag_idx_of(k);
     s_reg{diag_idx} = regs.s{diag_idx} + lambda_fixed;
 end
 

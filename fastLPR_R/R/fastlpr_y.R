@@ -291,7 +291,9 @@ row_sd <- function(x) {
         # Generate random probe vectors for DOF estimation
         # NOTE: R's rnorm will NOT match MATLAB's randn (different algorithms)
         # For cross-language tests, use opt$dof_random_vectors from MATLAB
-        if (!is.null(regs$opt$seed)) set.seed(regs$opt$seed)
+        dof_seed <- regs$opt$dof_seed
+        if (is.null(dof_seed)) dof_seed <- if (!is.null(regs$opt$seed)) regs$opt$seed else 42
+        set.seed(dof_seed)
         p <- matrix(rnorm(Tx * num_dof_sample), nrow = Tx, ncol = num_dof_sample)
       }
 
@@ -484,10 +486,16 @@ row_sd <- function(x) {
       # Find bandwidths with GCV <= threshold
       ihgood <- which(gcv_scores <= semin)
 
-      # Among these, select largest bandwidth (sum of h)
+      # Among these, select largest bandwidth (sum of h);
+      # ties on max sum(h) broken by smallest GCV (matches MATLAB reference)
       if (length(ihgood) > 0) {
         hsum <- rowSums(regs$h[ihgood, , drop = FALSE])
-        id1se <- ihgood[which.max(hsum)]
+        max_h_idx <- which.max(hsum)
+        id1se <- ihgood[max_h_idx]
+        same_sum <- ihgood[hsum == hsum[max_h_idx]]
+        if (length(same_sum) > 1) {
+          id1se <- same_sum[which.min(gcv_scores[same_sum])]
+        }
       } else {
         id1se <- idmin
       }

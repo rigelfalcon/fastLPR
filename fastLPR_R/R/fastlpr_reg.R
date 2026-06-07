@@ -235,18 +235,21 @@ fastlpr_reg <- function(regs, y_ft) {
 #' @keywords internal
 apply_adaptive_regularization_r <- function(regs) {
   # Regularize ALL diagonal elements of the design matrix S.
-  # For a (nt x nt) system stored in lower-triangular form, diagonal indices
-  # are k*(k+1)/2 for k = 1, ..., nt.
-  # Using lwp$nt (number of polynomial terms = system size) ensures all
-  # diagonal elements are stabilized, preventing Inf/NaN from Cramer's rule
-  # when any bandwidth produces near-zero kernel sums.
+  # S is stored column-major lower-triangular (for j in 1:nt, for i in j:nt:
+  # store S(i,j)), so the k-th diagonal element S(k,k) is at storage index
+  #   diag_idx(k) = k + (k-1)*(2*nt - k)/2.
+  # (The earlier k*(k+1)/2 was the row-major UPPER-triangular formula, which
+  # only coincides at k=1 and k=nt; for nt>=3 it perturbed an off-diagonal
+  # moment and missed a true diagonal, mis-regularizing the system.)
+  # Stabilizing the true diagonal prevents Inf/NaN from Cramer's rule when a
+  # bandwidth produces near-zero kernel sums.
   nt <- regs$lwp$nt
+  diag_idx_of <- function(k) k + (k - 1) * (2 * nt - k) / 2
 
   # Find the maximum diagonal element across all spatial points and bandwidths
   max_diag <- max(abs(regs$s[[1]]))
   for (k in 2:nt) {
-    diag_idx <- k * (k + 1) / 2
-    max_diag <- max(max_diag, max(abs(regs$s[[diag_idx]])))
+    max_diag <- max(max_diag, max(abs(regs$s[[diag_idx_of(k)]])))
   }
 
   alpha <- 1e-6
@@ -255,7 +258,7 @@ apply_adaptive_regularization_r <- function(regs) {
   # Apply regularization to ALL diagonal elements: S_reg = S + lambda*I
   s_reg <- lapply(regs$s, function(x) x + 0)  # Force copy
   for (k in 1:nt) {
-    diag_idx <- k * (k + 1) / 2
+    diag_idx <- diag_idx_of(k)
     s_reg[[diag_idx]] <- s_reg[[diag_idx]] + lambda_fixed
   }
 

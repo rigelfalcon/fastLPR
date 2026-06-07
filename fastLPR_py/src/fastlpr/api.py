@@ -133,7 +133,13 @@ def _one_se_rule(
         # This prefers smoother fits and reduces overfitting
         candidate_bandwidths = bandwidths[candidate_indices]
         bandwidth_sums = np.sum(candidate_bandwidths, axis=1)
-        selected_idx = candidate_indices[np.argmax(bandwidth_sums)]
+        candidate_scores = valid_scores[candidates_mask]  # aligned with candidate_indices
+        max_sum = bandwidth_sums.max()
+        # ties on max sum(h) broken by smallest GCV (matches MATLAB reference)
+        tie_mask = bandwidth_sums == max_sum
+        tie_positions = np.where(tie_mask)[0]
+        best_tie_pos = tie_positions[int(np.argmin(candidate_scores[tie_mask]))]
+        selected_idx = int(candidate_indices[best_tie_pos])
     else:
         # For maximization (e.g., likelihood)
         best_valid_idx = int(np.argmax(valid_scores))
@@ -595,7 +601,7 @@ def cv_fastlpr(
     with timer(
         f"DOF estimation (vectorized, {dh_filtered} bandwidths, {num_dof_samples} samples)"
     ):
-        dof_all, dof_stderr_all, penalty_std_all = estimate_dof_nufft_vectorized(
+        dof_all, dof_stderr_all, penalty_std_all, penalty_mean_all = estimate_dof_nufft_vectorized(
             model.x_scaled,
             model.x_raw,  # Must use RAW space for interpolation (from MATLAB!)
             bandwidths_filtered,  # Use filtered bandwidths
@@ -704,10 +710,12 @@ def cv_fastlpr(
             dof = dof_all[idx]
             dof_stderr = dof_stderr_all[idx]
             penalty_std = penalty_std_all[idx]
+            penalty_mean = None if penalty_mean_all is None else penalty_mean_all[idx]
 
             # Compute GCV score with aggregation for multi-response
             gcv, info = compute_gcv(
                 model.y_raw, yhat, dof, dof_stderr=dof_stderr, penalty_std=penalty_std,
+                penalty_mean=penalty_mean,
                 aggregation=gcv_selection
             )
 
